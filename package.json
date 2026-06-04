@@ -1,0 +1,30 @@
+{
+  "name": "selo",
+  "version": "0.0.1",
+  "private": true,
+  "packageManager": "pnpm@9.0.0",
+  "scripts": {
+    "dev:api": "pnpm --filter @selo/api dev",
+    "dev:mobile": "pnpm --filter @selo/mobile start",
+    "dev:admin": "pnpm --filter @selo/admin dev",
+    "build:api": "pnpm --filter @selo/api build",
+    "build:admin": "pnpm --filter @selo/admin build",
+    "docker:up": "docker-compose up -d",
+    "docker:down": "docker-compose down",
+    "docker:logs": "docker-compose logs -f",
+    "db:migrate": "pnpm --filter @selo/api prisma:migrate",
+    "db:generate": "pnpm --filter @selo/api prisma:generate",
+    "db:studio": "pnpm --filter @selo/api prisma:studio",
+    "db:deploy": "pnpm --filter @selo/api prisma:deploy",
+    "lint": "pnpm --recursive lint",
+    "typecheck": "pnpm --recursive typecheck",
+    "format": "prettier --write \"**/*.{ts,tsx,json,md}\" --ignore-path .gitignore"
+  },
+  "devDependencies": {
+    "@typescript-eslint/eslint-plugin": "^7.0.0",
+    "@typescript-eslint/parser": "^7.0.0",
+    "eslint": "^8.57.0",
+    "prettier": "^3.2.5",
+    "typescript": "^5.3.3"
+  }
+}

@@ -1,0 +1,43 @@
+import { Module } from '@nestjs/common';
+import { ConfigModule } from '@nestjs/config';
+import { PrismaModule } from './prisma/prisma.module';
+import { AuthModule } from './modules/auth/auth.module';
+import { UsersModule } from './modules/users/users.module';
+import { ProfilesModule } from './modules/profiles/profiles.module';
+import { ReceivingKeysModule } from './modules/receiving-keys/receiving-keys.module';
+import { ReceivingDestinationsModule } from './modules/receiving-destinations/receiving-destinations.module';
+import { AgreementsModule } from './modules/agreements/agreements.module';
+import { AgreementEventsModule } from './modules/agreement-events/agreement-events.module';
+import { FinancialGuaranteesModule } from './modules/financial-guarantees/financial-guarantees.module';
+import { PaymentsModule } from './modules/payments/payments.module';
+import { PixModule } from './modules/pix/pix.module';
+import { DisputesModule } from './modules/disputes/disputes.module';
+import { TrustScoreModule } from './modules/trust-score/trust-score.module';
+import { BlockchainRecordsModule } from './modules/blockchain-records/blockchain-records.module';
+import { NotificationsModule } from './modules/notifications/notifications.module';
+import { AuditLogsModule } from './modules/audit-logs/audit-logs.module';
+import { AdminModule } from './modules/admin/admin.module';
+
+@Module({
+  imports: [
+    ConfigModule.forRoot({ isGlobal: true, envFilePath: '.env' }),
+    PrismaModule,
+    AuthModule,
+    UsersModule,
+    ProfilesModule,
+    ReceivingKeysModule,
+    ReceivingDestinationsModule,
+    AgreementsModule,
+    AgreementEventsModule,
+    FinancialGuaranteesModule,
+    PaymentsModule,
+    PixModule,
+    DisputesModule,
+    TrustScoreModule,
+    BlockchainRecordsModule,
+    NotificationsModule,
+    AuditLogsModule,
+    AdminModule,
+  ],
+})
+export class AppModule {}

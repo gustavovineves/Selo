@@ -1,0 +1,367 @@
+// Selo — Prisma Schema
+// Este arquivo é a fonte da verdade para o banco de dados.
+// Para aplicar alterações: pnpm db:migrate
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// =============
+// ENUMS
+// =============
+
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+  DELETED
+}
+
+enum AgreementStatus {
+  DRAFT
+  PENDING_ACCEPTANCE
+  ACTIVE
+  COMPLETED
+  DISPUTED
+  CANCELLED
+  EXPIRED
+}
+
+enum AgreementType {
+  SIMPLE
+  WITH_GUARANTEE
+}
+
+enum PaymentStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+  REFUNDED
+}
+
+enum PaymentMethod {
+  PIX
+}
+
+enum DisputeStatus {
+  OPEN
+  UNDER_REVIEW
+  RESOLVED_FAVOR_CREATOR
+  RESOLVED_FAVOR_COUNTERPART
+  CLOSED
+}
+
+enum ReceivingKeyType {
+  CPF
+  CNPJ
+  EMAIL
+  PHONE
+  RANDOM
+}
+
+enum GuaranteeStatus {
+  PENDING
+  LOCKED
+  RELEASED
+  REVERTED
+}
+
+enum BlockchainStatus {
+  PENDING
+  CONFIRMED
+  FAILED
+}
+
+// =============
+// MODELS
+// =============
+
+model User {
+  id            String     @id @default(cuid())
+  email         String     @unique
+  phone         String?    @unique
+  document      String?    @unique
+  passwordHash  String
+  status        UserStatus @default(ACTIVE)
+  emailVerified Boolean    @default(false)
+  phoneVerified Boolean    @default(false)
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  profile               Profile?
+  receivingKeys         ReceivingKey[]
+  receivingDestinations ReceivingDestination[]
+  agreementsAsCreator   Agreement[]            @relation("AgreementCreator")
+  agreementsAsCounterpart Agreement[]          @relation("AgreementCounterpart")
+  trustScore            TrustScore?
+  notifications         Notification[]
+  auditLogs             AuditLog[]
+  disputesOpened        Dispute[]
+
+  @@index([email])
+  @@index([document])
+  @@map("users")
+}
+
+model Profile {
+  id          String   @id @default(cuid())
+  userId      String   @unique
+  fullName    String
+  displayName String?
+  avatarUrl   String?
+  bio         String?
+  city        String?
+  state       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("profiles")
+}
+
+model ReceivingKey {
+  id        String           @id @default(cuid())
+  userId    String
+  type      ReceivingKeyType
+  key       String
+  isDefault Boolean          @default(false)
+  active    Boolean          @default(true)
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  payments Payment[]
+
+  @@unique([userId, key])
+  @@index([key])
+  @@map("receiving_keys")
+}
+
+model ReceivingDestination {
+  id        String           @id @default(cuid())
+  userId    String
+  nickname  String
+  keyType   ReceivingKeyType
+  keyValue  String
+  bankName  String?
+  isDefault Boolean          @default(false)
+  active    Boolean          @default(true)
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  payments Payment[]
+
+  @@index([userId])
+  @@map("receiving_destinations")
+}
+
+model Agreement {
+  id               String          @id @default(cuid())
+  title            String
+  description      String
+  type             AgreementType   @default(SIMPLE)
+  status           AgreementStatus @default(DRAFT)
+  creatorId        String
+  counterpartId    String?
+  counterpartEmail String?
+  dueDate          DateTime?
+  amount           Decimal?        @db.Decimal(18, 2)
+  currency         String          @default("BRL")
+  terms            String
+  proofHash        String?
+  blockchainTxId   String?
+  expiresAt        DateTime?
+  completedAt      DateTime?
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+
+  creator            User                @relation("AgreementCreator", fields: [creatorId], references: [id])
+  counterpart        User?               @relation("AgreementCounterpart", fields: [counterpartId], references: [id])
+  events             AgreementEvent[]
+  financialGuarantee FinancialGuarantee?
+  payments           Payment[]
+  dispute            Dispute?
+  blockchainRecord   BlockchainRecord?
+
+  @@index([creatorId])
+  @@index([counterpartId])
+  @@index([status])
+  @@map("agreements")
+}
+
+model AgreementEvent {
+  id          String   @id @default(cuid())
+  agreementId String
+  actorId     String?
+  type        String
+  payload     Json?
+  note        String?
+  createdAt   DateTime @default(now())
+
+  agreement Agreement @relation(fields: [agreementId], references: [id], onDelete: Cascade)
+
+  @@index([agreementId])
+  @@map("agreement_events")
+}
+
+model FinancialGuarantee {
+  id          String          @id @default(cuid())
+  agreementId String          @unique
+  amount      Decimal         @db.Decimal(18, 2)
+  currency    String          @default("BRL")
+  status      GuaranteeStatus @default(PENDING)
+  lockedAt    DateTime?
+  releasedAt  DateTime?
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  agreement Agreement @relation(fields: [agreementId], references: [id], onDelete: Cascade)
+  payment   Payment?
+
+  @@map("financial_guarantees")
+}
+
+model Payment {
+  id                   String               @id @default(cuid())
+  agreementId          String?
+  financialGuaranteeId String?              @unique
+  payerId              String
+  receivingKeyId       String?
+  destinationId        String?
+  method               PaymentMethod        @default(PIX)
+  amount               Decimal              @db.Decimal(18, 2)
+  currency             String               @default("BRL")
+  status               PaymentStatus        @default(PENDING)
+  externalId           String?
+  metadata             Json?
+  paidAt               DateTime?
+  createdAt            DateTime             @default(now())
+  updatedAt            DateTime             @updatedAt
+
+  agreement          Agreement?            @relation(fields: [agreementId], references: [id])
+  financialGuarantee FinancialGuarantee?   @relation(fields: [financialGuaranteeId], references: [id])
+  receivingKey       ReceivingKey?         @relation(fields: [receivingKeyId], references: [id])
+  destination        ReceivingDestination? @relation(fields: [destinationId], references: [id])
+  pixTransaction     PixTransaction?
+
+  @@index([agreementId])
+  @@index([payerId])
+  @@map("payments")
+}
+
+model PixTransaction {
+  id           String    @id @default(cuid())
+  paymentId    String    @unique
+  txid         String?   @unique
+  endToEndId   String?   @unique
+  pixKey       String
+  pixKeyType   String
+  qrCode       String?
+  qrCodeBase64 String?
+  expiresAt    DateTime?
+  paidAt       DateTime?
+  rawResponse  Json?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  payment Payment @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+
+  @@map("pix_transactions")
+}
+
+model Dispute {
+  id          String        @id @default(cuid())
+  agreementId String        @unique
+  openedById  String
+  reason      String
+  description String
+  status      DisputeStatus @default(OPEN)
+  resolution  String?
+  resolvedAt  DateTime?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  agreement Agreement @relation(fields: [agreementId], references: [id], onDelete: Cascade)
+  openedBy  User      @relation(fields: [openedById], references: [id])
+
+  @@index([agreementId])
+  @@map("disputes")
+}
+
+model TrustScore {
+  id                  String   @id @default(cuid())
+  userId              String   @unique
+  score               Int      @default(500)
+  totalAgreements     Int      @default(0)
+  completedAgreements Int      @default(0)
+  disputesOpened      Int      @default(0)
+  disputesLost        Int      @default(0)
+  lastCalculatedAt    DateTime @default(now())
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("trust_scores")
+}
+
+model BlockchainRecord {
+  id          String           @id @default(cuid())
+  agreementId String           @unique
+  network     String           @default("ethereum-testnet")
+  txHash      String?
+  blockNumber BigInt?
+  proofData   Json?
+  status      BlockchainStatus @default(PENDING)
+  confirmedAt DateTime?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  agreement Agreement @relation(fields: [agreementId], references: [id], onDelete: Cascade)
+
+  @@map("blockchain_records")
+}
+
+model Notification {
+  id        String    @id @default(cuid())
+  userId    String
+  type      String
+  title     String
+  body      String
+  data      Json?
+  read      Boolean   @default(false)
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, read])
+  @@map("notifications")
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  userId     String?
+  action     String
+  resource   String
+  resourceId String?
+  oldData    Json?
+  newData    Json?
+  ip         String?
+  userAgent  String?
+  createdAt  DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([resource, resourceId])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
