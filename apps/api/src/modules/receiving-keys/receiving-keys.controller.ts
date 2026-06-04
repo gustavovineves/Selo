@@ -1,37 +1,63 @@
-import { Controller, Get, Post, Delete, Patch, Param, Body, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Delete,
+  Param,
+  Body,
+  UseGuards,
+  HttpCode,
+  HttpStatus,
+} from '@nestjs/common';
 import { ReceivingKeysService } from './receiving-keys.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { AuthenticatedUser } from '../auth/strategies/jwt.strategy';
 import { CreateReceivingKeyDto } from './dto/create-receiving-key.dto';
 
 @Controller('receiving-keys')
-@UseGuards(JwtAuthGuard)
 export class ReceivingKeysController {
   constructor(private readonly service: ReceivingKeysService) {}
 
-  @Get()
-  findAll(@CurrentUser() user: { id: string }) {
-    return this.service.findAllByUser(user.id);
-  }
+  // ── Protected ──────────────────────────────────────────────────
 
   @Post()
+  @UseGuards(JwtAuthGuard)
   create(
-    @CurrentUser() user: { id: string },
+    @CurrentUser() user: AuthenticatedUser,
     @Body() dto: CreateReceivingKeyDto,
   ) {
     return this.service.create(user.id, dto);
   }
 
-  @Patch(':id/default')
-  setDefault(
-    @CurrentUser() user: { id: string },
-    @Param('id') id: string,
-  ) {
-    return this.service.setDefault(user.id, id);
+  @Get('me')
+  @UseGuards(JwtAuthGuard)
+  findMine(@CurrentUser() user: AuthenticatedUser) {
+    return this.service.findActive(user.id);
   }
 
-  @Delete(':id')
-  remove(@CurrentUser() user: { id: string }, @Param('id') id: string) {
-    return this.service.remove(user.id, id);
+  @Get('history')
+  @UseGuards(JwtAuthGuard)
+  findHistory(@CurrentUser() user: AuthenticatedUser) {
+    return this.service.findHistory(user.id);
+  }
+
+  @Delete('me')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  remove(@CurrentUser() user: AuthenticatedUser) {
+    return this.service.remove(user.id);
+  }
+
+  // ── Public ─────────────────────────────────────────────────────
+
+  @Get('check/:key')
+  check(@Param('key') key: string) {
+    return this.service.checkAvailability(key);
+  }
+
+  @Get('resolve/:key')
+  resolve(@Param('key') key: string) {
+    return this.service.resolve(key);
   }
 }

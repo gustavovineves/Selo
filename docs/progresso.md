@@ -29,7 +29,8 @@
 | Migration inicial (`init_complete_schema`) | ✅ Aplicada |
 | Prisma Client | ✅ Gerado |
 | Auth / Usuários / Sessão | ✅ Implementado (Fase 2) |
-| Git local | ✅ Limpo após commit da Fase 2 |
+| Chave de Recebimento do App | ✅ Implementado (Fase 3) |
+| Git local | ✅ Limpo após commit da Fase 3 |
 
 ### Estrutura do monorepo
 
@@ -77,20 +78,48 @@ docs/           Documentação técnica
 - **CPF e KYC ficam para o onboarding financeiro** — não solicitados no cadastro inicial.
 - Schema Prisma **não foi alterado** nesta fase. Nenhuma migration nova foi necessária.
 
-### Documentação gerada
+---
 
-- [docs/auth.md](auth.md) — endpoints, payloads, exemplos PowerShell/curl, fluxo futuro OTP
+## 4. Fase 3 — Chave de Recebimento do App (Implementada)
+
+### Endpoints disponíveis
+
+| Método | Rota | Auth | Descrição |
+|--------|------|------|-----------|
+| POST | `/api/v1/receiving-keys` | JWT | Criar handle do usuário |
+| GET | `/api/v1/receiving-keys/me` | JWT | Buscar chave ativa |
+| GET | `/api/v1/receiving-keys/history` | JWT | Histórico de chaves |
+| DELETE | `/api/v1/receiving-keys/me` | JWT | Excluir chave ativa |
+| GET | `/api/v1/receiving-keys/check/:key` | Público | Verificar disponibilidade |
+| GET | `/api/v1/receiving-keys/resolve/:key` | Público | Resolver recebedor para confirmação visual |
+
+### O que foi implementado
+
+- Handle interno no formato `@erika` (letras, números, ponto, underline, hífen)
+- Normalização: `@ERIKA` → stored `erika`, exibido `@erika`
+- Um usuário tem no máximo uma chave **ativa** por vez
+- `normalizedKey @unique` global — handle excluído não pode ser reutilizado no MVP
+- Validação de formato (regex, tamanho 3–30) e lista de handles reservados
+- Soft delete: `status: DELETED`, `deletedAt`, `isDefault: false`
+- Verificação de pendências antes de excluir (acordos, pagamentos, payout, refund, disputas)
+- `resolve/:key` retorna apenas dados públicos seguros (userId, displayName, avatarUrl, key)
+- `check/:key` é público e responde sem exigir token
+
+### Decisões importantes desta fase
+
+- **`type = RANDOM`** no schema: handles internos usam o tipo Pix `RANDOM` no MVP, por ser o mais próximo semanticamente. Em Fase 4-5, quando o Pix real for integrado, avaliar adicionar `APP_HANDLE` ao enum (requer migration).
+- **Sem migration nova**: o model `ReceivingKey` já existia no schema e suporta os campos necessários.
+- **Chave não é chave Pix**: serve apenas para localizar o recebedor dentro do app e confirmar identidade antes de um acordo.
 
 ---
 
-## 4. O Que NÃO Foi Implementado Ainda
+## 5. O Que NÃO Foi Implementado Ainda
 
 Os módulos abaixo existem como stubs (`NotImplementedException`) e aguardam as fases futuras:
 
 | Funcionalidade | Fase | Módulo |
 |---|---|---|
-| Chave de Recebimento do App | Fase 3 | `receiving-keys` |
-| Destinos de recebimento | Fase 3 | `receiving-destinations` |
+| Destinos de recebimento | Fase 4 | `receiving-destinations` |
 | Acordos simples | Fase 4 | `agreements` |
 | Acordos com garantia | Fase 4 | `agreements` + `financial-guarantees` |
 | Pix (cobrança e payout) | Fase 4 | `pix` + `payments` |
@@ -102,27 +131,29 @@ Os módulos abaixo existem como stubs (`NotImplementedException`) e aguardam as 
 
 ---
 
-## 5. Próxima Fase
+## 6. Próxima Fase
 
-### Fase 3 — Chave de Recebimento do App
+### Fase 4 — Acordos Simples
 
-Objetivo: permitir que o usuário cadastre suas chaves Pix no Selo para poder receber dinheiro em acordos com garantia.
+Objetivo: permitir que dois usuários criem, aceitem e concluam um acordo simples (sem dinheiro) registrado no Selo.
 
 O que implementar:
-- `POST /receiving-keys` — cadastrar chave Pix (CPF, CNPJ, email, telefone, aleatória)
-- `GET /receiving-keys` — listar chaves ativas do usuário
-- `PATCH /receiving-keys/:id/default` — definir chave padrão
-- `DELETE /receiving-keys/:id` — remover chave (soft delete com quarentena)
-- Normalização da chave (`normalizedKey`) para unicidade global
-- Validação do tipo de chave (formato correto por tipo)
-- Regra: chave excluída não pode ser reutilizada no MVP (`normalizedKey @unique`)
-- Regra: no máximo uma chave `isDefault = true` por usuário (enforçado pelo serviço)
+- `POST /agreements` — criar acordo simples (SIMPLE type)
+- `GET /agreements` — listar acordos do usuário (criados ou como participante)
+- `GET /agreements/:id` — detalhe de um acordo
+- `POST /agreements/:id/accept` — aceitar um acordo (contraparte)
+- `POST /agreements/:id/reject` — rejeitar um acordo
+- `POST /agreements/:id/confirm` — confirmar conclusão (ambas as partes ou creador)
+- `POST /agreements/:id/cancel` — cancelar acordo
+- Registro de eventos no `AgreementEvent` a cada mudança de status
+- Registro de histórico no `AgreementStatusHistory`
+- `contentHash` (SHA256 dos termos) calculado no momento da criação
 
-Referência de schema: [docs/database.md](database.md) — Model `ReceivingKey`
+Não implementar ainda: Pix, garantia financeira, disputas, blockchain.
 
 ---
 
-## 6. Comandos Úteis
+## 7. Comandos Úteis
 
 ```bash
 # Subir banco de dados (PostgreSQL porta 5434)
@@ -157,17 +188,27 @@ $token = $res.accessToken
 
 # Ver usuário atual
 Invoke-RestMethod -Uri "http://localhost:3000/api/v1/auth/me" -Headers @{ Authorization = "Bearer $token" }
+
+# Criar chave de recebimento
+$body = '{"key":"@dev"}'
+Invoke-RestMethod -Uri "http://localhost:3000/api/v1/receiving-keys" -Method Post `
+  -Headers @{ Authorization = "Bearer $token" } `
+  -Body $body -ContentType "application/json"
+
+# Resolver chave (público)
+Invoke-RestMethod -Uri "http://localhost:3000/api/v1/receiving-keys/resolve/dev"
 ```
 
 ---
 
-## 7. Links de Documentação
+## 8. Links de Documentação
 
 | Arquivo | Conteúdo |
 |---------|----------|
 | [CLAUDE.md](../CLAUDE.md) | Instruções do produto e regras de trabalho com Claude |
 | [docs/architecture.md](architecture.md) | Arquitetura geral e fluxos |
 | [docs/auth.md](auth.md) | Autenticação: endpoints, exemplos, fluxo futuro OTP |
+| [docs/receiving-keys.md](receiving-keys.md) | Chave de Recebimento do App: conceito, endpoints, regras, exemplos |
 | [docs/database.md](database.md) | Todos os 22 models e 37 enums do schema Prisma |
 | [docs/modules.md](modules.md) | Endpoints de todos os módulos do backend |
 | [docs/getting-started.md](getting-started.md) | Setup inicial do ambiente |

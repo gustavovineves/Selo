@@ -1,10 +1,8 @@
-import { IsString, IsEnum } from 'class-validator';
-import { ReceivingKeyType } from '@prisma/client';
+import { IsString } from 'class-validator';
+import { Transform } from 'class-transformer';
 
 export class CreateReceivingKeyDto {
-  @IsEnum(ReceivingKeyType)
-  type: ReceivingKeyType;
-
   @IsString()
+  @Transform(({ value }: { value: string }) => value?.trim())
   key: string;
 }
