@@ -1,6 +1,6 @@
 # Progresso do Projeto Selo
 
-Última atualização: 2026-06-04
+Última atualização: 2026-06-04 (Fase 4)
 
 ---
 
@@ -30,7 +30,8 @@
 | Prisma Client | ✅ Gerado |
 | Auth / Usuários / Sessão | ✅ Implementado (Fase 2) |
 | Chave de Recebimento do App | ✅ Implementado (Fase 3) |
-| Git local | ✅ Limpo após commit da Fase 3 |
+| Acordos Simples | ✅ Implementado (Fase 4) |
+| Git local | ✅ Limpo após commit da Fase 4 |
 
 ### Estrutura do monorepo
 
@@ -113,19 +114,64 @@ docs/           Documentação técnica
 
 ---
 
+## 4b. Fase 4 — Acordos Simples (Implementada)
+
+### Endpoints disponíveis
+
+| Método | Rota | Auth | Descrição |
+|--------|------|------|-----------|
+| POST | `/api/v1/agreements/simple` | JWT | Criar acordo simples |
+| GET | `/api/v1/agreements` | JWT | Listar meus acordos |
+| GET | `/api/v1/agreements/:id` | JWT | Detalhe de um acordo |
+| POST | `/api/v1/agreements/:id/accept` | JWT | Aceitar acordo (contraparte) |
+| POST | `/api/v1/agreements/:id/decline` | JWT | Recusar acordo (contraparte) |
+| POST | `/api/v1/agreements/:id/cancel` | JWT | Cancelar acordo |
+| POST | `/api/v1/agreements/:id/complete` | JWT | Concluir acordo |
+| GET | `/api/v1/agreements/:id/events` | JWT | Histórico de eventos |
+
+### O que foi implementado
+
+- Criação de acordo simples via `counterpartyKey` (resolve pelo handle da contraparte)
+- Validação: não criar acordo consigo mesmo, chave deve estar ativa
+- `contentHash` SHA256 dos termos calculado localmente na criação
+- `generatedSummary` — frase automática descrevendo o acordo
+- `receiverKeySnapshot` — snapshot da chave da contraparte no momento da criação
+- Participantes criados automaticamente: CREATOR (aceito) + COUNTERPART (pendente)
+- Eventos registrados: CREATED, SENT, ACCEPTED, REJECTED, CANCELLED, COMPLETED
+- Histórico de status registrado em `AgreementStatusHistory` a cada transição
+- Listagem com filtros (`status`, `type`, `page`, `limit`)
+- Segurança: usuário só acessa acordos dos quais é participante
+- `GET /agreements/:id/events` protegido por participação
+
+### Ciclo de vida
+
+```
+AWAITING_ACCEPTANCE → (aceite) → ACTIVE → (conclusão) → COMPLETED
+AWAITING_ACCEPTANCE → (recusa/cancelamento) → CANCELLED
+ACTIVE → (cancelamento) → CANCELLED
+```
+
+### Decisões desta fase
+
+- `decline` usa `CANCELLED` como status final do acordo (não existe `DECLINED` no enum). Participante recusante recebe `status: REJECTED`.
+- `confirmationRule = SINGLE_PARTY` é o default: qualquer participante pode concluir o acordo.
+- Acordos simples **não têm dinheiro**, então cancelamento em `ACTIVE` é permitido para qualquer participante.
+- Schema **não foi alterado**. Nenhuma migration nova foi necessária.
+
+---
+
 ## 5. O Que NÃO Foi Implementado Ainda
 
 Os módulos abaixo existem como stubs (`NotImplementedException`) e aguardam as fases futuras:
 
 | Funcionalidade | Fase | Módulo |
 |---|---|---|
-| Destinos de recebimento | Fase 4 | `receiving-destinations` |
-| Acordos simples | Fase 4 | `agreements` |
-| Acordos com garantia | Fase 4 | `agreements` + `financial-guarantees` |
-| Pix (cobrança e payout) | Fase 4 | `pix` + `payments` |
-| Score de confiança | Fase 4 | `trust-score` |
+| Destinos de recebimento | Fase 5 | `receiving-destinations` |
+| Acordos com garantia | Fase 5 | `agreements` + `financial-guarantees` |
+| Pix (cobrança e payout) | Fase 5 | `pix` + `payments` |
+| Score de confiança | Fase 5 | `trust-score` |
 | Disputas | Fase 5 | `disputes` |
-| Blockchain (prova) | Fase 5 | `blockchain-records` |
+| Blockchain (prova) | Fase 6 | `blockchain-records` |
 | Fitbank / BaaS | Fase 6 | `pix` + `payments` |
 | Painel Admin | Fase 6 | `admin` + `apps/admin` |
 
@@ -133,23 +179,20 @@ Os módulos abaixo existem como stubs (`NotImplementedException`) e aguardam as 
 
 ## 6. Próxima Fase
 
-### Fase 4 — Acordos Simples
+### Fase 5 — Acordos com Garantia e Score de Confiança
 
-Objetivo: permitir que dois usuários criem, aceitem e concluam um acordo simples (sem dinheiro) registrado no Selo.
+Objetivo: permitir acordos que travam dinheiro e calcular score de confiança a partir do histórico.
 
 O que implementar:
-- `POST /agreements` — criar acordo simples (SIMPLE type)
-- `GET /agreements` — listar acordos do usuário (criados ou como participante)
-- `GET /agreements/:id` — detalhe de um acordo
-- `POST /agreements/:id/accept` — aceitar um acordo (contraparte)
-- `POST /agreements/:id/reject` — rejeitar um acordo
-- `POST /agreements/:id/confirm` — confirmar conclusão (ambas as partes ou creador)
-- `POST /agreements/:id/cancel` — cancelar acordo
-- Registro de eventos no `AgreementEvent` a cada mudança de status
-- Registro de histórico no `AgreementStatusHistory`
-- `contentHash` (SHA256 dos termos) calculado no momento da criação
+- Acordos com `type: WITH_GUARANTEE`
+- `FinancialGuarantee` — trava de valor no acordo
+- `PaymentIntent` e `PixCharge` — stub de cobrança (integração Pix real na Fase 6)
+- `Payout` — stub de liberação de valor
+- Cálculo e atualização de `TrustScore` após conclusão/cancelamento/disputa
+- `Dispute` — abertura e resolução básica de disputas
+- `ReceivingDestination` — destinos de pagamento salvos pelo usuário
 
-Não implementar ainda: Pix, garantia financeira, disputas, blockchain.
+Não implementar ainda: Fitbank real, blockchain, mobile, admin.
 
 ---
 
@@ -209,6 +252,7 @@ Invoke-RestMethod -Uri "http://localhost:3000/api/v1/receiving-keys/resolve/dev"
 | [docs/architecture.md](architecture.md) | Arquitetura geral e fluxos |
 | [docs/auth.md](auth.md) | Autenticação: endpoints, exemplos, fluxo futuro OTP |
 | [docs/receiving-keys.md](receiving-keys.md) | Chave de Recebimento do App: conceito, endpoints, regras, exemplos |
+| [docs/agreements.md](agreements.md) | Acordos Simples: ciclo de vida, endpoints, regras, exemplos PowerShell |
 | [docs/database.md](database.md) | Todos os 22 models e 37 enums do schema Prisma |
 | [docs/modules.md](modules.md) | Endpoints de todos os módulos do backend |
 | [docs/getting-started.md](getting-started.md) | Setup inicial do ambiente |

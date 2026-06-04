@@ -1,14 +1,36 @@
-import { Injectable, NotImplementedException } from '@nestjs/common';
-
-// TODO: Fase 2 — implementar eventos de acordo
+import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+import { PrismaService } from '../../prisma/prisma.service';
 
 @Injectable()
 export class AgreementEventsService {
-  findAllByAgreement(_userId: string, _agreementId: string) {
-    throw new NotImplementedException('Agreement events — Fase 2');
-  }
+  constructor(private readonly prisma: PrismaService) {}
 
-  create(_agreementId: string, _actorId: string, _type: string, _payload?: unknown) {
-    throw new NotImplementedException('Agreement events — Fase 2');
+  async findAllByAgreement(userId: string, agreementId: string) {
+    const agreement = await this.prisma.agreement.findUnique({
+      where: { id: agreementId },
+      select: { participants: { select: { userId: true } } },
+    });
+
+    if (!agreement) throw new NotFoundException('Acordo não encontrado.');
+
+    const isParticipant = agreement.participants.some((p) => p.userId === userId);
+    if (!isParticipant) {
+      throw new ForbiddenException('Você não tem acesso a este acordo.');
+    }
+
+    return this.prisma.agreementEvent.findMany({
+      where: { agreementId },
+      orderBy: { createdAt: 'asc' },
+      select: {
+        id: true,
+        agreementId: true,
+        actorId: true,
+        actorType: true,
+        type: true,
+        payload: true,
+        note: true,
+        createdAt: true,
+      },
+    });
   }
 }
