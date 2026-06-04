@@ -1,6 +1,9 @@
+// =============================================================
 // Selo — Prisma Schema
-// Este arquivo é a fonte da verdade para o banco de dados.
-// Para aplicar alterações: pnpm db:migrate
+// Fonte da verdade para o banco de dados.
+// Não rodar migrations sem coordenação da equipe.
+// Atualizar este arquivo → pnpm db:migrate
+// =============================================================
 
 generator client {
   provider = "prisma-client-js"
@@ -11,50 +14,28 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// =============
-// ENUMS
-// =============
+// =============================================================
+// ENUMS — Usuários e Identidade
+// =============================================================
 
 enum UserStatus {
   ACTIVE
   SUSPENDED
+  PENDING_VERIFICATION
   DELETED
 }
 
-enum AgreementStatus {
-  DRAFT
-  PENDING_ACCEPTANCE
-  ACTIVE
-  COMPLETED
-  DISPUTED
-  CANCELLED
-  EXPIRED
-}
-
-enum AgreementType {
-  SIMPLE
-  WITH_GUARANTEE
-}
-
-enum PaymentStatus {
+enum KycStatus {
   PENDING
-  PROCESSING
-  COMPLETED
-  FAILED
-  REFUNDED
-}
-
-enum PaymentMethod {
-  PIX
-}
-
-enum DisputeStatus {
-  OPEN
+  SUBMITTED
   UNDER_REVIEW
-  RESOLVED_FAVOR_CREATOR
-  RESOLVED_FAVOR_COUNTERPART
-  CLOSED
+  APPROVED
+  REJECTED
 }
+
+// =============================================================
+// ENUMS — Chaves e Destinos de Recebimento
+// =============================================================
 
 enum ReceivingKeyType {
   CPF
@@ -64,304 +45,966 @@ enum ReceivingKeyType {
   RANDOM
 }
 
-enum GuaranteeStatus {
-  PENDING
-  LOCKED
-  RELEASED
-  REVERTED
+enum ReceivingKeyStatus {
+  ACTIVE
+  PENDING_VALIDATION
+  QUARANTINED
+  DELETED
 }
 
-enum BlockchainStatus {
+enum ReceivingDestinationType {
+  PIX_CPF
+  PIX_CNPJ
+  PIX_EMAIL
+  PIX_PHONE
+  PIX_RANDOM
+}
+
+enum ReceivingDestinationStatus {
+  ACTIVE
+  DELETED
+}
+
+// =============================================================
+// ENUMS — Acordos
+// =============================================================
+
+enum AgreementType {
+  SIMPLE
+  WITH_GUARANTEE
+}
+
+enum AgreementMode {
+  STANDARD
+  REAL_TIME
+}
+
+enum AgreementOperationalStatus {
+  DRAFT
+  AWAITING_ACCEPTANCE
+  ACTIVE
+  AWAITING_CONFIRMATION
+  COMPLETED
+  CANCELLED
+  EXPIRED
+}
+
+enum AgreementFinancialStatus {
+  NONE
+  AWAITING_PAYMENT
+  FUNDS_HELD
+  AWAITING_PAYOUT
+  PAID_OUT
+  AWAITING_REFUND
+  REFUNDED
+  DISPUTED
+}
+
+enum AgreementParticipantRole {
+  CREATOR
+  COUNTERPART
+  WITNESS
+  MEDIATOR
+}
+
+enum AgreementParticipantStatus {
   PENDING
+  ACCEPTED
+  REJECTED
+  WITHDRAWN
+}
+
+enum AgreementEventType {
+  CREATED
+  SENT
+  ACCEPTANCE_REQUESTED
+  ACCEPTED
+  REJECTED
+  ACTIVATED
+  PAYMENT_REQUESTED
+  PAYMENT_RECEIVED
+  FUNDS_LOCKED
+  CONFIRMATION_REQUESTED
+  CONFIRMED
+  COMPLETED
+  DISPUTE_OPENED
+  DISPUTE_RESOLVED
+  CANCELLED
+  EXPIRED
+  BLOCKCHAIN_SUBMITTED
+  BLOCKCHAIN_CONFIRMED
+  PAYOUT_INITIATED
+  PAYOUT_COMPLETED
+  REFUND_INITIATED
+  REFUND_COMPLETED
+}
+
+enum ConfirmationRule {
+  MANUAL
+  SINGLE_PARTY
+  AUTO_ON_DUE_DATE
+}
+
+enum ReleaseRule {
+  MANUAL
+  AUTO_ON_CONFIRMATION
+  AUTO_ON_DUE_DATE
+}
+
+enum RefundRule {
+  MANUAL
+  AUTO_ON_DISPUTE_WIN
+  AUTO_ON_EXPIRY
+}
+
+enum DisputeRule {
+  ALLOWED
+  NOT_ALLOWED
+}
+
+// =============================================================
+// ENUMS — Financeiro
+// =============================================================
+
+enum FinancialGuaranteeStatus {
+  AWAITING_PAYMENT
+  LOCKED
+  AWAITING_PAYOUT
+  PAID_OUT
+  AWAITING_REFUND
+  REFUNDED
+  FROZEN_DISPUTE
+}
+
+enum PaymentProvider {
+  PIX
+  FITBANK
+}
+
+enum PaymentMethod {
+  PIX
+  BANK_TRANSFER
+}
+
+enum PaymentIntentStatus {
+  PENDING
+  AWAITING_PAYMENT
+  PAID
+  FAILED
+  CANCELLED
+  EXPIRED
+}
+
+enum PixChargeStatus {
+  PENDING
+  ACTIVE
+  COMPLETED
+  EXPIRED
+  FAILED
+}
+
+enum PayoutStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+enum RefundStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+// =============================================================
+// ENUMS — Disputas
+// =============================================================
+
+enum DisputeStatus {
+  OPEN
+  UNDER_REVIEW
+  AWAITING_EVIDENCE
+  RESOLVED_FAVOR_CREATOR
+  RESOLVED_FAVOR_COUNTERPART
+  WITHDRAWN
+  CLOSED
+}
+
+enum DisputeMessageType {
+  TEXT
+  EVIDENCE
+  SYSTEM_NOTE
+  ADMIN_NOTE
+  RESOLUTION
+}
+
+// =============================================================
+// ENUMS — Score de Confiança
+// =============================================================
+
+enum TrustScoreLevel {
+  VERY_LOW
+  LOW
+  MEDIUM
+  HIGH
+  VERY_HIGH
+}
+
+enum TrustScoreEventType {
+  INITIAL_SCORE
+  AGREEMENT_COMPLETED
+  AGREEMENT_CANCELLED_BY_USER
+  DISPUTE_OPENED
+  DISPUTE_WON
+  DISPUTE_LOST
+  KYC_VERIFIED
+  MANUAL_ADJUSTMENT
+}
+
+// =============================================================
+// ENUMS — Blockchain
+// =============================================================
+
+enum BlockchainNetwork {
+  ETHEREUM_TESTNET
+  POLYGON_TESTNET
+  ETHEREUM_MAINNET
+  POLYGON_MAINNET
+}
+
+enum BlockchainRecordStatus {
+  PENDING
+  SUBMITTED
   CONFIRMED
   FAILED
 }
 
-// =============
-// MODELS
-// =============
+// =============================================================
+// ENUMS — Notificações e Auditoria
+// =============================================================
+
+enum NotificationType {
+  AGREEMENT_RECEIVED
+  AGREEMENT_ACCEPTED
+  AGREEMENT_REJECTED
+  AGREEMENT_COMPLETED
+  AGREEMENT_CANCELLED
+  AGREEMENT_EXPIRED
+  PAYMENT_RECEIVED
+  FUNDS_LOCKED
+  PAYOUT_SENT
+  REFUND_PROCESSED
+  DISPUTE_OPENED
+  DISPUTE_RESOLVED
+  TRUST_SCORE_UPDATED
+  SYSTEM_ALERT
+}
+
+enum NotificationStatus {
+  UNREAD
+  READ
+  DISMISSED
+}
+
+enum AuditAction {
+  USER_CREATED
+  USER_UPDATED
+  USER_SUSPENDED
+  USER_DELETED
+  LOGIN_SUCCESS
+  LOGIN_FAILED
+  LOGOUT
+  PASSWORD_CHANGED
+  AGREEMENT_CREATED
+  AGREEMENT_SENT
+  AGREEMENT_ACCEPTED
+  AGREEMENT_REJECTED
+  AGREEMENT_COMPLETED
+  AGREEMENT_CANCELLED
+  AGREEMENT_DISPUTED
+  PAYMENT_INITIATED
+  PAYMENT_COMPLETED
+  PAYMENT_FAILED
+  PAYOUT_INITIATED
+  PAYOUT_COMPLETED
+  REFUND_INITIATED
+  REFUND_COMPLETED
+  ADMIN_ACTION
+  ADMIN_DISPUTE_RESOLVED
+  ADMIN_USER_SUSPENDED
+}
+
+enum AdminRole {
+  SUPER_ADMIN
+  ADMIN
+  SUPPORT
+  READ_ONLY
+}
+
+enum AdminStatus {
+  ACTIVE
+  SUSPENDED
+  DELETED
+}
+
+// =============================================================
+// MODEL: User
+// =============================================================
 
 model User {
-  id            String     @id @default(cuid())
-  email         String     @unique
-  phone         String?    @unique
-  document      String?    @unique
-  passwordHash  String
-  status        UserStatus @default(ACTIVE)
-  emailVerified Boolean    @default(false)
-  phoneVerified Boolean    @default(false)
-  createdAt     DateTime   @default(now())
-  updatedAt     DateTime   @updatedAt
+  id              String     @id @default(cuid())
+  email           String     @unique
+  phone           String?    @unique
+  document        String?    @unique // CPF/CNPJ — apenas dígitos
+  documentType    String? // "CPF" | "CNPJ"
+  passwordHash    String
+  status          UserStatus @default(ACTIVE)
+  kycStatus       KycStatus  @default(PENDING)
+  emailVerifiedAt DateTime?
+  phoneVerifiedAt DateTime?
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+  deletedAt       DateTime?
 
-  profile               Profile?
-  receivingKeys         ReceivingKey[]
-  receivingDestinations ReceivingDestination[]
-  agreementsAsCreator   Agreement[]            @relation("AgreementCreator")
-  agreementsAsCounterpart Agreement[]          @relation("AgreementCounterpart")
-  trustScore            TrustScore?
-  notifications         Notification[]
-  auditLogs             AuditLog[]
-  disputesOpened        Dispute[]
+  profile                 UserProfile?
+  sessions                DeviceSession[]
+  receivingKeys           ReceivingKey[]
+  receivingDestinations   ReceivingDestination[]
+  createdAgreements       Agreement[]            @relation("AgreementCreator")
+  payerAgreements         Agreement[]            @relation("AgreementPayer")
+  receiverAgreements      Agreement[]            @relation("AgreementReceiver")
+  agreementParticipations AgreementParticipant[]
+  paymentIntents          PaymentIntent[]
+  receivedPayouts         Payout[]               @relation("PayoutRecipient")
+  requestedRefunds        Refund[]               @relation("RefundRequester")
+  receivedRefunds         Refund[]               @relation("RefundRecipient")
+  openedDisputes          Dispute[]
+  trustScore              TrustScore?
+  trustScoreEvents        TrustScoreEvent[]
+  notifications           Notification[]
+  auditLogs               AuditLog[]
 
   @@index([email])
   @@index([document])
+  @@index([status])
   @@map("users")
 }
 
-model Profile {
-  id          String   @id @default(cuid())
-  userId      String   @unique
+// =============================================================
+// MODEL: UserProfile
+// =============================================================
+
+model UserProfile {
+  id          String    @id @default(cuid())
+  userId      String    @unique
   fullName    String
   displayName String?
   avatarUrl   String?
   bio         String?
   city        String?
   state       String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  country     String?   @default("BR")
+  birthDate   DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@map("profiles")
+  @@map("user_profiles")
 }
 
+// =============================================================
+// MODEL: DeviceSession
+// Cada sessão autenticada de um dispositivo.
+// Utilizado para suportar logout por dispositivo e múltiplos
+// refresh tokens sem invalidar outros aparelhos.
+// =============================================================
+
+model DeviceSession {
+  id           String    @id @default(cuid())
+  userId       String
+  refreshToken String    @unique
+  deviceName   String?
+  deviceOs     String?
+  ip           String?
+  userAgent    String?
+  expiresAt    DateTime
+  revokedAt    DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("device_sessions")
+}
+
+// =============================================================
+// MODEL: ReceivingKey
+// Chave Pix registrada pelo usuário para receber pagamentos.
+// normalizedKey é globalmente único — chaves excluídas não
+// podem ser reutilizadas por outro usuário no MVP.
+// =============================================================
+
 model ReceivingKey {
-  id        String           @id @default(cuid())
-  userId    String
-  type      ReceivingKeyType
-  key       String
-  isDefault Boolean          @default(false)
-  active    Boolean          @default(true)
-  createdAt DateTime         @default(now())
-  updatedAt DateTime         @updatedAt
+  id               String             @id @default(cuid())
+  userId           String
+  type             ReceivingKeyType
+  key              String // chave no formato original exibido ao usuário
+  normalizedKey    String             @unique // normalizada: lowercase / só dígitos
+  status           ReceivingKeyStatus @default(ACTIVE)
+  isDefault        Boolean            @default(false)
+  quarantinedUntil DateTime? // bloqueada para evitar fraude pós-exclusão
+  deletedAt        DateTime?
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
 
-  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  payments Payment[]
+  user       User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  pixCharges PixCharge[]
 
-  @@unique([userId, key])
-  @@index([key])
+  @@index([userId, status])
+  @@index([normalizedKey])
   @@map("receiving_keys")
 }
 
+// =============================================================
+// MODEL: ReceivingDestination
+// Destino de pagamento salvo pelo usuário (para pagar outros).
+// =============================================================
+
 model ReceivingDestination {
-  id        String           @id @default(cuid())
+  id        String                     @id @default(cuid())
   userId    String
   nickname  String
-  keyType   ReceivingKeyType
+  type      ReceivingDestinationType
   keyValue  String
+  status    ReceivingDestinationStatus @default(ACTIVE)
   bankName  String?
-  isDefault Boolean          @default(false)
-  active    Boolean          @default(true)
-  createdAt DateTime         @default(now())
-  updatedAt DateTime         @updatedAt
+  bankIspb  String? // código ISPB do banco destino
+  isDefault Boolean                    @default(false)
+  metadata  Json?
+  deletedAt DateTime?
+  createdAt DateTime                   @default(now())
+  updatedAt DateTime                   @updatedAt
 
-  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  payments Payment[]
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  payouts Payout[]
 
-  @@index([userId])
+  @@index([userId, status])
   @@map("receiving_destinations")
 }
 
-model Agreement {
-  id               String          @id @default(cuid())
-  title            String
-  description      String
-  type             AgreementType   @default(SIMPLE)
-  status           AgreementStatus @default(DRAFT)
-  creatorId        String
-  counterpartId    String?
-  counterpartEmail String?
-  dueDate          DateTime?
-  amount           Decimal?        @db.Decimal(18, 2)
-  currency         String          @default("BRL")
-  terms            String
-  proofHash        String?
-  blockchainTxId   String?
-  expiresAt        DateTime?
-  completedAt      DateTime?
-  createdAt        DateTime        @default(now())
-  updatedAt        DateTime        @updatedAt
+// =============================================================
+// MODEL: Agreement
+// Núcleo do produto. Suporta acordos simples e com garantia.
+// Dois eixos de status independentes:
+//   operationalStatus — ciclo de vida do acordo
+//   financialStatus   — estado do dinheiro associado
+// =============================================================
 
-  creator            User                @relation("AgreementCreator", fields: [creatorId], references: [id])
-  counterpart        User?               @relation("AgreementCounterpart", fields: [counterpartId], references: [id])
+model Agreement {
+  id                          String                     @id @default(cuid())
+  type                        AgreementType
+  mode                        AgreementMode              @default(STANDARD)
+  operationalStatus           AgreementOperationalStatus @default(DRAFT)
+  financialStatus             AgreementFinancialStatus   @default(NONE)
+  title                       String
+  generatedSummary            String? // resumo gerado pelo sistema
+  description                 String?
+  amount                      Decimal?                   @db.Decimal(18, 2)
+  currency                    String                     @default("BRL")
+  dueDate                     DateTime?
+  acceptanceExpiresAt         DateTime? // prazo para contraparte aceitar
+  confirmationDeadlineAt      DateTime? // prazo para confirmação de conclusão
+  createdById                 String
+  payerId                     String? // quem paga a garantia (WITH_GUARANTEE)
+  receiverId                  String? // quem recebe o payout (WITH_GUARANTEE)
+  receiverKeySnapshot         Json? // snapshot da chave do recebedor
+  receiverDestinationSnapshot Json? // snapshot do destino do recebedor
+  confirmationRule            ConfirmationRule           @default(MANUAL)
+  releaseRule                 ReleaseRule                @default(MANUAL)
+  refundRule                  RefundRule                 @default(MANUAL)
+  disputeRule                 DisputeRule                @default(ALLOWED)
+  proofHash                   String? // SHA256 dos termos para blockchain
+  createdAt                   DateTime                   @default(now())
+  updatedAt                   DateTime                   @updatedAt
+  completedAt                 DateTime?
+  canceledAt                  DateTime?
+  disputedAt                  DateTime?
+
+  createdBy          User                     @relation("AgreementCreator", fields: [createdById], references: [id])
+  payer              User?                    @relation("AgreementPayer", fields: [payerId], references: [id])
+  receiver           User?                    @relation("AgreementReceiver", fields: [receiverId], references: [id])
+  participants       AgreementParticipant[]
   events             AgreementEvent[]
+  statusHistory      AgreementStatusHistory[]
   financialGuarantee FinancialGuarantee?
-  payments           Payment[]
+  paymentIntents     PaymentIntent[]
+  payouts            Payout[]
+  refunds            Refund[]
   dispute            Dispute?
   blockchainRecord   BlockchainRecord?
 
-  @@index([creatorId])
-  @@index([counterpartId])
-  @@index([status])
+  @@index([createdById])
+  @@index([payerId])
+  @@index([receiverId])
+  @@index([operationalStatus])
+  @@index([financialStatus])
+  @@index([createdAt])
   @@map("agreements")
 }
 
+// =============================================================
+// MODEL: AgreementParticipant
+// Participantes formais de um acordo com seus papéis e status.
+// =============================================================
+
+model AgreementParticipant {
+  id          String                     @id @default(cuid())
+  agreementId String
+  userId      String?
+  email       String? // para participantes sem conta no Selo
+  role        AgreementParticipantRole
+  status      AgreementParticipantStatus @default(PENDING)
+  acceptedAt  DateTime?
+  rejectedAt  DateTime?
+  createdAt   DateTime                   @default(now())
+  updatedAt   DateTime                   @updatedAt
+
+  agreement Agreement @relation(fields: [agreementId], references: [id], onDelete: Cascade)
+  user      User?     @relation(fields: [userId], references: [id])
+
+  @@unique([agreementId, userId])
+  @@index([agreementId])
+  @@index([userId])
+  @@map("agreement_participants")
+}
+
+// =============================================================
+// MODEL: AgreementEvent
+// Linha do tempo imutável de cada acordo.
+// =============================================================
+
 model AgreementEvent {
-  id          String   @id @default(cuid())
+  id          String             @id @default(cuid())
   agreementId String
   actorId     String?
-  type        String
+  actorType   String? // "USER" | "SYSTEM" | "ADMIN"
+  type        AgreementEventType
   payload     Json?
   note        String?
-  createdAt   DateTime @default(now())
+  createdAt   DateTime           @default(now())
 
   agreement Agreement @relation(fields: [agreementId], references: [id], onDelete: Cascade)
 
   @@index([agreementId])
+  @@index([type])
   @@map("agreement_events")
 }
 
-model FinancialGuarantee {
-  id          String          @id @default(cuid())
-  agreementId String          @unique
-  amount      Decimal         @db.Decimal(18, 2)
-  currency    String          @default("BRL")
-  status      GuaranteeStatus @default(PENDING)
-  lockedAt    DateTime?
-  releasedAt  DateTime?
-  createdAt   DateTime        @default(now())
-  updatedAt   DateTime        @updatedAt
+// =============================================================
+// MODEL: AgreementStatusHistory
+// Histórico auditável de cada mudança de status.
+// =============================================================
+
+model AgreementStatusHistory {
+  id                  String                      @id @default(cuid())
+  agreementId         String
+  actorId             String?
+  previousOperational AgreementOperationalStatus?
+  newOperational      AgreementOperationalStatus?
+  previousFinancial   AgreementFinancialStatus?
+  newFinancial        AgreementFinancialStatus?
+  reason              String?
+  createdAt           DateTime                    @default(now())
 
   agreement Agreement @relation(fields: [agreementId], references: [id], onDelete: Cascade)
-  payment   Payment?
+
+  @@index([agreementId])
+  @@map("agreement_status_history")
+}
+
+// =============================================================
+// MODEL: FinancialGuarantee
+// Existe apenas para acordos WITH_GUARANTEE.
+// Representa o dinheiro travado no período do acordo.
+// =============================================================
+
+model FinancialGuarantee {
+  id          String                   @id @default(cuid())
+  agreementId String                   @unique
+  amount      Decimal                  @db.Decimal(18, 2)
+  currency    String                   @default("BRL")
+  status      FinancialGuaranteeStatus @default(AWAITING_PAYMENT)
+  lockedAt    DateTime?
+  releasedAt  DateTime?
+  revertedAt  DateTime?
+  createdAt   DateTime                 @default(now())
+  updatedAt   DateTime                 @updatedAt
+
+  agreement     Agreement      @relation(fields: [agreementId], references: [id], onDelete: Cascade)
+  paymentIntent PaymentIntent? @relation("GuaranteePaymentIntent")
+  payout        Payout?        @relation("GuaranteePayout")
+  refund        Refund?        @relation("GuaranteeRefund")
 
   @@map("financial_guarantees")
 }
 
-model Payment {
-  id                   String               @id @default(cuid())
+// =============================================================
+// MODEL: PaymentIntent
+// Intenção de pagamento. Representa um pedido de cobrança.
+// idempotencyKey garante que a mesma operação não seja
+// executada duas vezes em caso de retry.
+// =============================================================
+
+model PaymentIntent {
+  id                   String              @id @default(cuid())
   agreementId          String?
-  financialGuaranteeId String?              @unique
+  financialGuaranteeId String?             @unique
   payerId              String
-  receivingKeyId       String?
-  destinationId        String?
-  method               PaymentMethod        @default(PIX)
-  amount               Decimal              @db.Decimal(18, 2)
-  currency             String               @default("BRL")
-  status               PaymentStatus        @default(PENDING)
+  amount               Decimal             @db.Decimal(18, 2)
+  currency             String              @default("BRL")
+  provider             PaymentProvider     @default(PIX)
+  method               PaymentMethod       @default(PIX)
+  status               PaymentIntentStatus @default(PENDING)
+  idempotencyKey       String              @unique
   externalId           String?
   metadata             Json?
   paidAt               DateTime?
-  createdAt            DateTime             @default(now())
-  updatedAt            DateTime             @updatedAt
+  failedAt             DateTime?
+  canceledAt           DateTime?
+  expiresAt            DateTime?
+  createdAt            DateTime            @default(now())
+  updatedAt            DateTime            @updatedAt
 
-  agreement          Agreement?            @relation(fields: [agreementId], references: [id])
-  financialGuarantee FinancialGuarantee?   @relation(fields: [financialGuaranteeId], references: [id])
-  receivingKey       ReceivingKey?         @relation(fields: [receivingKeyId], references: [id])
-  destination        ReceivingDestination? @relation(fields: [destinationId], references: [id])
-  pixTransaction     PixTransaction?
+  agreement          Agreement?          @relation(fields: [agreementId], references: [id])
+  financialGuarantee FinancialGuarantee? @relation("GuaranteePaymentIntent", fields: [financialGuaranteeId], references: [id])
+  payer              User                @relation(fields: [payerId], references: [id])
+  pixCharge          PixCharge?
+  refunds            Refund[]
 
   @@index([agreementId])
   @@index([payerId])
-  @@map("payments")
+  @@index([status])
+  @@map("payment_intents")
 }
 
-model PixTransaction {
-  id           String    @id @default(cuid())
-  paymentId    String    @unique
-  txid         String?   @unique
-  endToEndId   String?   @unique
-  pixKey       String
-  pixKeyType   String
-  qrCode       String?
-  qrCodeBase64 String?
-  expiresAt    DateTime?
-  paidAt       DateTime?
-  rawResponse  Json?
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+// =============================================================
+// MODEL: PixCharge
+// Cobrança Pix gerada para um PaymentIntent.
+// Contém QR Code, txid do PSP e dados da liquidação.
+// =============================================================
 
-  payment Payment @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+model PixCharge {
+  id              String           @id @default(cuid())
+  paymentIntentId String           @unique
+  receivingKeyId  String? // chave usada; nullable pois a chave pode ser excluída depois
+  txid            String?          @unique // ID da cobrança no PSP
+  endToEndId      String?          @unique // E2eId da liquidação Pix
+  pixKey          String // valor da chave no momento da cobrança
+  pixKeyType      ReceivingKeyType
+  qrCode          String? // copia-e-cola EMV
+  qrCodeBase64    String? // imagem do QR Code em base64
+  amount          Decimal          @db.Decimal(18, 2)
+  status          PixChargeStatus  @default(PENDING)
+  expiresAt       DateTime?
+  paidAt          DateTime?
+  rawRequest      Json? // payload enviado ao PSP
+  rawResponse     Json? // resposta bruta do PSP
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
 
-  @@map("pix_transactions")
+  paymentIntent PaymentIntent @relation(fields: [paymentIntentId], references: [id], onDelete: Cascade)
+  receivingKey  ReceivingKey? @relation(fields: [receivingKeyId], references: [id])
+
+  @@index([txid])
+  @@map("pix_charges")
 }
 
-model Dispute {
-  id          String        @id @default(cuid())
-  agreementId String        @unique
-  openedById  String
-  reason      String
-  description String
-  status      DisputeStatus @default(OPEN)
-  resolution  String?
-  resolvedAt  DateTime?
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
+// =============================================================
+// MODEL: Payout
+// Liberação de dinheiro para o recebedor após conclusão do acordo.
+// idempotencyKey garante execução única em caso de retry.
+// =============================================================
 
-  agreement Agreement @relation(fields: [agreementId], references: [id], onDelete: Cascade)
-  openedBy  User      @relation(fields: [openedById], references: [id])
+model Payout {
+  id                   String          @id @default(cuid())
+  agreementId          String
+  financialGuaranteeId String?         @unique
+  recipientId          String
+  destinationId        String? // ReceivingDestination utilizado; nullable
+  destinationSnapshot  Json? // snapshot do destino no momento do payout
+  amount               Decimal         @db.Decimal(18, 2)
+  currency             String          @default("BRL")
+  provider             PaymentProvider @default(PIX)
+  status               PayoutStatus    @default(PENDING)
+  idempotencyKey       String          @unique
+  externalId           String?
+  metadata             Json?
+  initiatedAt          DateTime?
+  completedAt          DateTime?
+  failedAt             DateTime?
+  createdAt            DateTime        @default(now())
+  updatedAt            DateTime        @updatedAt
+
+  agreement          Agreement             @relation(fields: [agreementId], references: [id])
+  financialGuarantee FinancialGuarantee?   @relation("GuaranteePayout", fields: [financialGuaranteeId], references: [id])
+  recipient          User                  @relation("PayoutRecipient", fields: [recipientId], references: [id])
+  destination        ReceivingDestination? @relation(fields: [destinationId], references: [id])
 
   @@index([agreementId])
+  @@index([recipientId])
+  @@index([status])
+  @@map("payouts")
+}
+
+// =============================================================
+// MODEL: Refund
+// Devolução de dinheiro ao pagador.
+// Pode ser originada de disputa, expiração ou cancelamento.
+// =============================================================
+
+model Refund {
+  id                   String       @id @default(cuid())
+  paymentIntentId      String
+  agreementId          String?
+  financialGuaranteeId String?      @unique
+  requestedById        String
+  recipientId          String // quem recebe o reembolso (geralmente o pagador)
+  amount               Decimal      @db.Decimal(18, 2)
+  currency             String       @default("BRL")
+  reason               String?
+  status               RefundStatus @default(PENDING)
+  idempotencyKey       String       @unique
+  externalId           String?
+  metadata             Json?
+  processedAt          DateTime?
+  failedAt             DateTime?
+  createdAt            DateTime     @default(now())
+  updatedAt            DateTime     @updatedAt
+
+  paymentIntent      PaymentIntent       @relation(fields: [paymentIntentId], references: [id])
+  agreement          Agreement?          @relation(fields: [agreementId], references: [id])
+  financialGuarantee FinancialGuarantee? @relation("GuaranteeRefund", fields: [financialGuaranteeId], references: [id])
+  requestedBy        User                @relation("RefundRequester", fields: [requestedById], references: [id])
+  recipient          User                @relation("RefundRecipient", fields: [recipientId], references: [id])
+
+  @@index([paymentIntentId])
+  @@index([agreementId])
+  @@index([status])
+  @@map("refunds")
+}
+
+// =============================================================
+// MODEL: Dispute
+// Trava o acordo e abre processo de mediação.
+// resolvedById pode ser ID de User ou de AdminUser.
+// =============================================================
+
+model Dispute {
+  id           String        @id @default(cuid())
+  agreementId  String        @unique
+  openedById   String
+  reason       String
+  description  String
+  status       DisputeStatus @default(OPEN)
+  resolution   String?
+  resolvedById String? // ID do User ou AdminUser que resolveu
+  resolvedAt   DateTime?
+  closedAt     DateTime?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  agreement Agreement        @relation(fields: [agreementId], references: [id], onDelete: Cascade)
+  openedBy  User             @relation(fields: [openedById], references: [id])
+  messages  DisputeMessage[]
+
+  @@index([status])
   @@map("disputes")
 }
 
-model TrustScore {
-  id                  String   @id @default(cuid())
-  userId              String   @unique
-  score               Int      @default(500)
-  totalAgreements     Int      @default(0)
-  completedAgreements Int      @default(0)
-  disputesOpened      Int      @default(0)
-  disputesLost        Int      @default(0)
-  lastCalculatedAt    DateTime @default(now())
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
+// =============================================================
+// MODEL: DisputeMessage
+// Mensagens trocadas durante a mediação de uma disputa.
+// =============================================================
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+model DisputeMessage {
+  id          String             @id @default(cuid())
+  disputeId   String
+  senderId    String?
+  senderType  String // "USER" | "ADMIN" | "SYSTEM"
+  type        DisputeMessageType @default(TEXT)
+  content     String
+  attachments Json? // lista de URLs/metadados de anexos
+  createdAt   DateTime           @default(now())
+
+  dispute Dispute @relation(fields: [disputeId], references: [id], onDelete: Cascade)
+
+  @@index([disputeId])
+  @@map("dispute_messages")
+}
+
+// =============================================================
+// MODEL: TrustScore
+// Score de confiança agregado por usuário.
+// Recalculado via TrustScoreService após eventos relevantes.
+// Range: 0–1000. Default: 500.
+// =============================================================
+
+model TrustScore {
+  id                  String          @id @default(cuid())
+  userId              String          @unique
+  score               Int             @default(500)
+  level               TrustScoreLevel @default(MEDIUM)
+  totalAgreements     Int             @default(0)
+  completedAgreements Int             @default(0)
+  canceledAgreements  Int             @default(0)
+  disputesOpened      Int             @default(0)
+  disputesWon         Int             @default(0)
+  disputesLost        Int             @default(0)
+  lastCalculatedAt    DateTime        @default(now())
+  createdAt           DateTime        @default(now())
+  updatedAt           DateTime        @updatedAt
+
+  user   User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  events TrustScoreEvent[]
 
   @@map("trust_scores")
 }
 
+// =============================================================
+// MODEL: TrustScoreEvent
+// Registro imutável de cada variação no score.
+// Permite auditar e recalcular o histórico completo.
+// =============================================================
+
+model TrustScoreEvent {
+  id            String              @id @default(cuid())
+  userId        String
+  trustScoreId  String
+  type          TrustScoreEventType
+  scoreBefore   Int
+  scoreDelta    Int // positivo = aumento; negativo = queda
+  scoreAfter    Int
+  reason        String?
+  referenceId   String? // ID do acordo, disputa, etc.
+  referenceType String? // "Agreement" | "Dispute" | "Manual"
+  createdAt     DateTime            @default(now())
+
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  trustScore TrustScore @relation(fields: [trustScoreId], references: [id])
+
+  @@index([userId])
+  @@index([trustScoreId])
+  @@index([createdAt])
+  @@map("trust_score_events")
+}
+
+// =============================================================
+// MODEL: BlockchainRecord
+// Stub para Fase 4. Armazena o hash SHA256 dos termos do acordo
+// e o hash da transação na blockchain após confirmação.
+// =============================================================
+
 model BlockchainRecord {
-  id          String           @id @default(cuid())
-  agreementId String           @unique
-  network     String           @default("ethereum-testnet")
-  txHash      String?
-  blockNumber BigInt?
-  proofData   Json?
-  status      BlockchainStatus @default(PENDING)
-  confirmedAt DateTime?
-  createdAt   DateTime         @default(now())
-  updatedAt   DateTime         @updatedAt
+  id              String                 @id @default(cuid())
+  agreementId     String                 @unique
+  network         BlockchainNetwork      @default(ETHEREUM_TESTNET)
+  txHash          String?
+  blockNumber     BigInt?
+  contractAddress String?
+  proofHash       String? // SHA256 do payload do acordo
+  proofData       Json? // dados usados para gerar o proofHash
+  status          BlockchainRecordStatus @default(PENDING)
+  retryCount      Int                    @default(0)
+  confirmedAt     DateTime?
+  failedAt        DateTime?
+  createdAt       DateTime               @default(now())
+  updatedAt       DateTime               @updatedAt
 
   agreement Agreement @relation(fields: [agreementId], references: [id], onDelete: Cascade)
 
+  @@index([txHash])
   @@map("blockchain_records")
 }
 
+// =============================================================
+// MODEL: Notification
+// Notificações internas e push para o app mobile.
+// data: JSON com deep link e metadados do evento.
+// =============================================================
+
 model Notification {
-  id        String    @id @default(cuid())
+  id        String             @id @default(cuid())
   userId    String
-  type      String
+  type      NotificationType
+  status    NotificationStatus @default(UNREAD)
   title     String
   body      String
-  data      Json?
-  read      Boolean   @default(false)
+  data      Json? // extras para deep link no app
   readAt    DateTime?
-  createdAt DateTime  @default(now())
+  sentAt    DateTime?
+  createdAt DateTime           @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@index([userId, read])
+  @@index([userId, status])
+  @@index([createdAt])
   @@map("notifications")
 }
 
+// =============================================================
+// MODEL: AuditLog
+// Registro auditável de ações críticas.
+// adminUserId é String (sem FK explícita) para desacoplar do
+// ciclo de vida de AdminUser e evitar cascade acidental.
+// =============================================================
+
 model AuditLog {
-  id         String   @id @default(cuid())
-  userId     String?
-  action     String
-  resource   String
-  resourceId String?
-  oldData    Json?
-  newData    Json?
-  ip         String?
-  userAgent  String?
-  createdAt  DateTime @default(now())
+  id          String      @id @default(cuid())
+  userId      String?
+  adminUserId String? // ID do AdminUser quando a ação vem do painel
+  action      AuditAction
+  resource    String
+  resourceId  String?
+  oldData     Json?
+  newData     Json?
+  ip          String?
+  userAgent   String?
+  requestId   String? // correlation ID da requisição HTTP
+  createdAt   DateTime    @default(now())
 
   user User? @relation(fields: [userId], references: [id])
 
   @@index([userId])
+  @@index([adminUserId])
   @@index([resource, resourceId])
+  @@index([action])
   @@index([createdAt])
   @@map("audit_logs")
+}
+
+// =============================================================
+// MODEL: AdminUser
+// Usuários do painel administrativo (Fase 4).
+// Autenticação separada dos usuários do app.
+// =============================================================
+
+model AdminUser {
+  id           String      @id @default(cuid())
+  email        String      @unique
+  name         String
+  passwordHash String
+  role         AdminRole   @default(SUPPORT)
+  status       AdminStatus @default(ACTIVE)
+  lastLoginAt  DateTime?
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+  deletedAt    DateTime?
+
+  @@index([email])
+  @@map("admin_users")
 }
