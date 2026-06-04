@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 
 @Injectable()
@@ -7,7 +8,10 @@ export class NotificationsService {
 
   async findAllByUser(userId: string, unreadOnly = false) {
     return this.prisma.notification.findMany({
-      where: { userId, ...(unreadOnly ? { read: false } : {}) },
+      where: {
+        userId,
+        ...(unreadOnly ? { status: 'UNREAD' } : {}),
+      },
       orderBy: { createdAt: 'desc' },
       take: 50,
     });
@@ -20,20 +24,32 @@ export class NotificationsService {
 
     return this.prisma.notification.update({
       where: { id },
-      data: { read: true, readAt: new Date() },
+      data: { status: 'READ', readAt: new Date() },
     });
   }
 
   async markAllRead(userId: string) {
     return this.prisma.notification.updateMany({
-      where: { userId, read: false },
-      data: { read: true, readAt: new Date() },
+      where: { userId, status: 'UNREAD' },
+      data: { status: 'READ', readAt: new Date() },
     });
   }
 
-  async send(userId: string, type: string, title: string, body: string, data?: Record<string, unknown>) {
+  async send(
+    userId: string,
+    type: string,
+    title: string,
+    body: string,
+    data?: Record<string, unknown>,
+  ) {
     return this.prisma.notification.create({
-      data: { userId, type, title, body, data },
+      data: {
+        userId,
+        type: type as Parameters<typeof this.prisma.notification.create>[0]['data']['type'],
+        title,
+        body,
+        data: data as Prisma.InputJsonValue,
+      },
     });
   }
 }

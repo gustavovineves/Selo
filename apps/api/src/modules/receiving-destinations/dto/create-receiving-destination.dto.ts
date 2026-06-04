@@ -1,12 +1,12 @@
 import { IsString, IsEnum, IsOptional, IsBoolean } from 'class-validator';
-import { ReceivingKeyType } from '@prisma/client';
+import { ReceivingDestinationType } from '@prisma/client';
 
 export class CreateReceivingDestinationDto {
   @IsString()
   nickname: string;
 
-  @IsEnum(ReceivingKeyType)
-  keyType: ReceivingKeyType;
+  @IsEnum(ReceivingDestinationType)
+  type: ReceivingDestinationType;
 
   @IsString()
   keyValue: string;

@@ -1,23 +1,28 @@
 import { Injectable } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 
 export interface CreateAuditLogDto {
   userId?: string;
-  action: string;
+  adminUserId?: string;
+  action: Prisma.AuditLogUncheckedCreateInput['action'];
   resource: string;
   resourceId?: string;
   oldData?: Record<string, unknown>;
   newData?: Record<string, unknown>;
   ip?: string;
   userAgent?: string;
+  requestId?: string;
 }
 
 @Injectable()
 export class AuditLogsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async log(data: CreateAuditLogDto) {
-    return this.prisma.auditLog.create({ data });
+  async log(dto: CreateAuditLogDto) {
+    return this.prisma.auditLog.create({
+      data: dto as Prisma.AuditLogUncheckedCreateInput,
+    });
   }
 
   async findByUser(userId: string, limit = 20) {

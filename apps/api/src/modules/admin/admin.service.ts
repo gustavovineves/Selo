@@ -6,18 +6,16 @@ export class AdminService {
   constructor(private readonly prisma: PrismaService) {}
 
   async getStats() {
-    const [users, agreements, disputes, payments] = await Promise.all([
+    const [totalUsers, totalAgreements, totalDisputes] = await Promise.all([
       this.prisma.user.count(),
-      this.prisma.agreement.groupBy({ by: ['status'], _count: true }),
-      this.prisma.dispute.groupBy({ by: ['status'], _count: true }),
-      this.prisma.payment.groupBy({ by: ['status'], _count: true }),
+      this.prisma.agreement.count(),
+      this.prisma.dispute.count(),
     ]);
 
     return {
-      users,
-      agreements,
-      disputes,
-      payments,
+      totalUsers,
+      totalAgreements,
+      totalDisputes,
       generatedAt: new Date().toISOString(),
     };
   }

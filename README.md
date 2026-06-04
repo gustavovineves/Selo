@@ -86,6 +86,7 @@ pnpm dev:mobile
 
 - [Arquitetura](docs/architecture.md)
 - [Como começar](docs/getting-started.md)
+- [Autenticação](docs/auth.md)
 - [Módulos do backend](docs/modules.md)
 - [Banco de dados — entidades e enums](docs/database.md)
 

@@ -7,14 +7,14 @@ export class ProfilesService {
   constructor(private readonly prisma: PrismaService) {}
 
   async findByUser(userId: string) {
-    const profile = await this.prisma.profile.findUnique({ where: { userId } });
+    const profile = await this.prisma.userProfile.findUnique({ where: { userId } });
     if (!profile) throw new NotFoundException('Profile not found');
     return profile;
   }
 
   async update(userId: string, dto: UpdateProfileDto) {
     await this.findByUser(userId);
-    return this.prisma.profile.update({
+    return this.prisma.userProfile.update({
       where: { userId },
       data: dto,
     });

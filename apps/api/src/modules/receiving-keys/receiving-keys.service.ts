@@ -1,6 +1,14 @@
-import { Injectable, NotFoundException, ConflictException, ForbiddenException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ConflictException,
+  ForbiddenException,
+  NotImplementedException,
+} from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateReceivingKeyDto } from './dto/create-receiving-key.dto';
+
+// TODO: Fase 2 — implementar Chave de Recebimento do App (ReceivingKey)
 
 @Injectable()
 export class ReceivingKeysService {
@@ -8,29 +16,14 @@ export class ReceivingKeysService {
 
   async findAllByUser(userId: string) {
     return this.prisma.receivingKey.findMany({
-      where: { userId, active: true },
+      where: { userId, status: { not: 'DELETED' } },
       orderBy: [{ isDefault: 'desc' }, { createdAt: 'asc' }],
     });
   }
 
-  async create(userId: string, dto: CreateReceivingKeyDto) {
-    const exists = await this.prisma.receivingKey.findFirst({
-      where: { userId, key: dto.key },
-    });
-    if (exists) throw new ConflictException('Key already registered');
-
-    const hasDefault = await this.prisma.receivingKey.findFirst({
-      where: { userId, isDefault: true },
-    });
-
-    return this.prisma.receivingKey.create({
-      data: {
-        userId,
-        type: dto.type,
-        key: dto.key,
-        isDefault: !hasDefault,
-      },
-    });
+  create(_userId: string, _dto: CreateReceivingKeyDto) {
+    // TODO: Fase 2 — validar chave no Pix antes de registrar
+    throw new NotImplementedException('Receiving keys — Fase 2');
   }
 
   async setDefault(userId: string, id: string) {
@@ -55,7 +48,7 @@ export class ReceivingKeysService {
 
     return this.prisma.receivingKey.update({
       where: { id },
-      data: { active: false },
+      data: { status: 'DELETED', deletedAt: new Date() },
     });
   }
 }

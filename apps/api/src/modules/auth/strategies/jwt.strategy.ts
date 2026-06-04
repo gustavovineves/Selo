@@ -7,6 +7,13 @@ import { PrismaService } from '../../../prisma/prisma.service';
 interface JwtPayload {
   sub: string;
   email: string;
+  sid?: string; // session ID embedded at token creation
+}
+
+export interface AuthenticatedUser {
+  id: string;
+  email: string;
+  sessionId?: string;
 }
 
 @Injectable()
@@ -22,16 +29,16 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     });
   }
 
-  async validate(payload: JwtPayload) {
+  async validate(payload: JwtPayload): Promise<AuthenticatedUser> {
     const user = await this.prisma.user.findUnique({
       where: { id: payload.sub },
       select: { id: true, email: true, status: true },
     });
 
     if (!user || user.status !== 'ACTIVE') {
-      throw new UnauthorizedException();
+      throw new UnauthorizedException('User inactive or not found');
     }
 
-    return { id: user.id, email: user.email };
+    return { id: user.id, email: user.email, sessionId: payload.sid };
   }
 }

@@ -3,6 +3,7 @@ import { ProfilesService } from './profiles.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { UpdateProfileDto } from './dto/update-profile.dto';
+import { AuthenticatedUser } from '../auth/strategies/jwt.strategy';
 
 @Controller('profiles')
 @UseGuards(JwtAuthGuard)
@@ -16,7 +17,7 @@ export class ProfilesController {
 
   @Patch('me')
   updateMe(
-    @CurrentUser() user: { id: string },
+    @CurrentUser() user: AuthenticatedUser,
     @Body() dto: UpdateProfileDto,
   ) {
     return this.profilesService.update(user.id, dto);
