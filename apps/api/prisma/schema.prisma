@@ -33,6 +33,21 @@ enum KycStatus {
   REJECTED
 }
 
+enum DocumentType {
+  CPF
+  CNPJ
+  PASSPORT
+  OTHER
+}
+
+// Tipo de ator em eventos, histórico de status e resoluções.
+// Utilizado em AgreementStatusHistory, AgreementEvent e Dispute.
+enum ActorType {
+  USER
+  ADMIN
+  SYSTEM
+}
+
 // =============================================================
 // ENUMS — Chaves e Destinos de Recebimento
 // =============================================================
@@ -355,18 +370,18 @@ enum AdminStatus {
 // =============================================================
 
 model User {
-  id              String     @id @default(cuid())
-  email           String     @unique
-  phone           String?    @unique
-  document        String?    @unique // CPF/CNPJ — apenas dígitos
-  documentType    String? // "CPF" | "CNPJ"
+  id              String        @id @default(cuid())
+  email           String        @unique
+  phone           String?       @unique
+  document        String?       @unique // CPF/CNPJ/Passaporte — apenas dígitos ou código
+  documentType    DocumentType?
   passwordHash    String
-  status          UserStatus @default(ACTIVE)
-  kycStatus       KycStatus  @default(PENDING)
+  status          UserStatus    @default(ACTIVE)
+  kycStatus       KycStatus     @default(PENDING)
   emailVerifiedAt DateTime?
   phoneVerifiedAt DateTime?
-  createdAt       DateTime   @default(now())
-  updatedAt       DateTime   @updatedAt
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
   deletedAt       DateTime?
 
   profile                 UserProfile?
@@ -419,8 +434,8 @@ model UserProfile {
 // =============================================================
 // MODEL: DeviceSession
 // Cada sessão autenticada de um dispositivo.
-// Utilizado para suportar logout por dispositivo e múltiplos
-// refresh tokens sem invalidar outros aparelhos.
+// Suporta logout por dispositivo e múltiplos refresh tokens
+// sem invalidar outros aparelhos.
 // =============================================================
 
 model DeviceSession {
@@ -439,6 +454,7 @@ model DeviceSession {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
+  @@index([userId, expiresAt]) // sessões ativas de um usuário
   @@map("device_sessions")
 }
 
@@ -447,6 +463,9 @@ model DeviceSession {
 // Chave Pix registrada pelo usuário para receber pagamentos.
 // normalizedKey é globalmente único — chaves excluídas não
 // podem ser reutilizadas por outro usuário no MVP.
+// IMPORTANTE: unicidade de isDefault = true por usuário deve
+// ser enforçada na camada de serviço (Prisma não suporta
+// partial unique index).
 // =============================================================
 
 model ReceivingKey {
@@ -464,6 +483,7 @@ model ReceivingKey {
 
   user       User        @relation(fields: [userId], references: [id], onDelete: Cascade)
   pixCharges PixCharge[]
+  payouts    Payout[] // payouts que usaram esta chave como destino
 
   @@index([userId, status])
   @@index([normalizedKey])
@@ -472,7 +492,11 @@ model ReceivingKey {
 
 // =============================================================
 // MODEL: ReceivingDestination
-// Destino de pagamento salvo pelo usuário (para pagar outros).
+// Destino de pagamento salvo pelo usuário (favoritos para
+// enviar dinheiro a outros). Separado de ReceivingKey, que
+// são as próprias chaves do usuário para receber.
+// IMPORTANTE: unicidade de isDefault = true por usuário deve
+// ser enforçada na camada de serviço.
 // =============================================================
 
 model ReceivingDestination {
@@ -491,7 +515,7 @@ model ReceivingDestination {
   updatedAt DateTime                   @updatedAt
 
   user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  payouts Payout[]
+  payouts Payout[] // payouts que usaram este destino salvo
 
   @@index([userId, status])
   @@map("receiving_destinations")
@@ -503,6 +527,11 @@ model ReceivingDestination {
 // Dois eixos de status independentes:
 //   operationalStatus — ciclo de vida do acordo
 //   financialStatus   — estado do dinheiro associado
+//
+// contentHash: SHA256 local dos termos do acordo, calculado
+// pelo backend no momento da criação.
+// Diferente de BlockchainRecord.proofHash, que é o hash
+// registrado/enviado à blockchain na Fase 4.
 // =============================================================
 
 model Agreement {
@@ -522,13 +551,13 @@ model Agreement {
   createdById                 String
   payerId                     String? // quem paga a garantia (WITH_GUARANTEE)
   receiverId                  String? // quem recebe o payout (WITH_GUARANTEE)
-  receiverKeySnapshot         Json? // snapshot da chave do recebedor
-  receiverDestinationSnapshot Json? // snapshot do destino do recebedor
+  receiverKeySnapshot         Json? // snapshot da chave do recebedor no momento da criação
+  receiverDestinationSnapshot Json? // snapshot do destino do recebedor no momento da criação
   confirmationRule            ConfirmationRule           @default(MANUAL)
   releaseRule                 ReleaseRule                @default(MANUAL)
   refundRule                  RefundRule                 @default(MANUAL)
   disputeRule                 DisputeRule                @default(ALLOWED)
-  proofHash                   String? // SHA256 dos termos para blockchain
+  contentHash                 String? // SHA256 local dos termos; ver BlockchainRecord.proofHash
   createdAt                   DateTime                   @default(now())
   updatedAt                   DateTime                   @updatedAt
   completedAt                 DateTime?
@@ -560,6 +589,14 @@ model Agreement {
 // =============================================================
 // MODEL: AgreementParticipant
 // Participantes formais de um acordo com seus papéis e status.
+//
+// Unicidade:
+// - @@unique([agreementId, userId]): um usuário registrado
+//   não pode ser participante duas vezes no mesmo acordo.
+// - @@unique([agreementId, email]): um email não registrado
+//   não pode ser convidado duas vezes no mesmo acordo.
+// - Validação adicional de duplicidade (userId null + email null)
+//   deve ser enforçada na camada de serviço.
 // =============================================================
 
 model AgreementParticipant {
@@ -578,21 +615,24 @@ model AgreementParticipant {
   user      User?     @relation(fields: [userId], references: [id])
 
   @@unique([agreementId, userId])
-  @@index([agreementId])
+  @@unique([agreementId, email])
+  @@index([agreementId, role]) // buscar criador ou contraparte de um acordo
   @@index([userId])
+  @@index([email]) // lookup de convites por email
   @@map("agreement_participants")
 }
 
 // =============================================================
 // MODEL: AgreementEvent
 // Linha do tempo imutável de cada acordo.
+// actorType identifica se a ação foi de usuário, admin ou sistema.
 // =============================================================
 
 model AgreementEvent {
   id          String             @id @default(cuid())
   agreementId String
   actorId     String?
-  actorType   String? // "USER" | "SYSTEM" | "ADMIN"
+  actorType   ActorType?
   type        AgreementEventType
   payload     Json?
   note        String?
@@ -607,13 +647,15 @@ model AgreementEvent {
 
 // =============================================================
 // MODEL: AgreementStatusHistory
-// Histórico auditável de cada mudança de status.
+// Histórico auditável de cada mudança de status operacional
+// e/ou financeiro. actorType identifica quem causou a mudança.
 // =============================================================
 
 model AgreementStatusHistory {
   id                  String                      @id @default(cuid())
   agreementId         String
   actorId             String?
+  actorType           ActorType?
   previousOperational AgreementOperationalStatus?
   newOperational      AgreementOperationalStatus?
   previousFinancial   AgreementFinancialStatus?
@@ -631,6 +673,12 @@ model AgreementStatusHistory {
 // MODEL: FinancialGuarantee
 // Existe apenas para acordos WITH_GUARANTEE.
 // Representa o dinheiro travado no período do acordo.
+//
+// Relações 1:N com PaymentIntent, Payout e Refund:
+// Uma garantia pode ter múltiplas tentativas de pagamento,
+// payout ou refund ao longo do tempo (retry flow).
+// O estado ativo de cada operação é controlado por status +
+// idempotencyKey na camada de serviço.
 // =============================================================
 
 model FinancialGuarantee {
@@ -645,10 +693,10 @@ model FinancialGuarantee {
   createdAt   DateTime                 @default(now())
   updatedAt   DateTime                 @updatedAt
 
-  agreement     Agreement      @relation(fields: [agreementId], references: [id], onDelete: Cascade)
-  paymentIntent PaymentIntent? @relation("GuaranteePaymentIntent")
-  payout        Payout?        @relation("GuaranteePayout")
-  refund        Refund?        @relation("GuaranteeRefund")
+  agreement      Agreement       @relation(fields: [agreementId], references: [id], onDelete: Cascade)
+  paymentIntents PaymentIntent[] @relation("GuaranteePaymentIntent") // múltiplas tentativas possíveis
+  payouts        Payout[]        @relation("GuaranteePayout") // múltiplas tentativas possíveis
+  refunds        Refund[]        @relation("GuaranteeRefund") // múltiplas tentativas possíveis
 
   @@map("financial_guarantees")
 }
@@ -658,12 +706,16 @@ model FinancialGuarantee {
 // Intenção de pagamento. Representa um pedido de cobrança.
 // idempotencyKey garante que a mesma operação não seja
 // executada duas vezes em caso de retry.
+//
+// financialGuaranteeId NÃO é @unique: uma garantia pode ter
+// múltiplos PaymentIntents (tentativas). Apenas um deve estar
+// em estado não-terminal por vez — enforçado pelo serviço.
 // =============================================================
 
 model PaymentIntent {
   id                   String              @id @default(cuid())
   agreementId          String?
-  financialGuaranteeId String?             @unique
+  financialGuaranteeId String? // sem @unique — permite retry
   payerId              String
   amount               Decimal             @db.Decimal(18, 2)
   currency             String              @default("BRL")
@@ -688,7 +740,9 @@ model PaymentIntent {
 
   @@index([agreementId])
   @@index([payerId])
+  @@index([payerId, status]) // query mais comum: pagamentos de um usuário por status
   @@index([status])
+  @@index([financialGuaranteeId])
   @@map("payment_intents")
 }
 
@@ -728,36 +782,50 @@ model PixCharge {
 // MODEL: Payout
 // Liberação de dinheiro para o recebedor após conclusão do acordo.
 // idempotencyKey garante execução única em caso de retry.
+//
+// financialGuaranteeId NÃO é @unique — permite retry.
+//
+// Semântica de destino:
+// - recipientKeyId: FK para a ReceivingKey do recebedor registrada
+//   no Selo (quando disponível).
+// - recipientDestinationId: FK para ReceivingDestination salva
+//   pelo usuário (quando o recebedor está como favorito).
+// - destinationSnapshot: snapshot do destino exato no momento
+//   do payout (sempre preenchido, independente dos FKs).
 // =============================================================
 
 model Payout {
-  id                   String          @id @default(cuid())
-  agreementId          String
-  financialGuaranteeId String?         @unique
-  recipientId          String
-  destinationId        String? // ReceivingDestination utilizado; nullable
-  destinationSnapshot  Json? // snapshot do destino no momento do payout
-  amount               Decimal         @db.Decimal(18, 2)
-  currency             String          @default("BRL")
-  provider             PaymentProvider @default(PIX)
-  status               PayoutStatus    @default(PENDING)
-  idempotencyKey       String          @unique
-  externalId           String?
-  metadata             Json?
-  initiatedAt          DateTime?
-  completedAt          DateTime?
-  failedAt             DateTime?
-  createdAt            DateTime        @default(now())
-  updatedAt            DateTime        @updatedAt
+  id                     String          @id @default(cuid())
+  agreementId            String
+  financialGuaranteeId   String? // sem @unique — permite retry
+  recipientId            String
+  recipientKeyId         String? // ReceivingKey do recebedor no Selo
+  recipientDestinationId String? // ReceivingDestination usado como favorito
+  destinationSnapshot    Json? // snapshot do destino exato no momento do payout
+  amount                 Decimal         @db.Decimal(18, 2)
+  currency               String          @default("BRL")
+  provider               PaymentProvider @default(PIX)
+  status                 PayoutStatus    @default(PENDING)
+  idempotencyKey         String          @unique
+  externalId             String?
+  metadata               Json?
+  initiatedAt            DateTime?
+  completedAt            DateTime?
+  failedAt               DateTime?
+  createdAt              DateTime        @default(now())
+  updatedAt              DateTime        @updatedAt
 
-  agreement          Agreement             @relation(fields: [agreementId], references: [id])
-  financialGuarantee FinancialGuarantee?   @relation("GuaranteePayout", fields: [financialGuaranteeId], references: [id])
-  recipient          User                  @relation("PayoutRecipient", fields: [recipientId], references: [id])
-  destination        ReceivingDestination? @relation(fields: [destinationId], references: [id])
+  agreement            Agreement             @relation(fields: [agreementId], references: [id])
+  financialGuarantee   FinancialGuarantee?   @relation("GuaranteePayout", fields: [financialGuaranteeId], references: [id])
+  recipient            User                  @relation("PayoutRecipient", fields: [recipientId], references: [id])
+  recipientKey         ReceivingKey?         @relation(fields: [recipientKeyId], references: [id])
+  recipientDestination ReceivingDestination? @relation(fields: [recipientDestinationId], references: [id])
 
   @@index([agreementId])
+  @@index([agreementId, status]) // verificar payout completo para um acordo
   @@index([recipientId])
   @@index([status])
+  @@index([financialGuaranteeId])
   @@map("payouts")
 }
 
@@ -765,13 +833,15 @@ model Payout {
 // MODEL: Refund
 // Devolução de dinheiro ao pagador.
 // Pode ser originada de disputa, expiração ou cancelamento.
+//
+// financialGuaranteeId NÃO é @unique — permite retry.
 // =============================================================
 
 model Refund {
   id                   String       @id @default(cuid())
   paymentIntentId      String
   agreementId          String?
-  financialGuaranteeId String?      @unique
+  financialGuaranteeId String? // sem @unique — permite retry
   requestedById        String
   recipientId          String // quem recebe o reembolso (geralmente o pagador)
   amount               Decimal      @db.Decimal(18, 2)
@@ -795,28 +865,31 @@ model Refund {
   @@index([paymentIntentId])
   @@index([agreementId])
   @@index([status])
+  @@index([financialGuaranteeId])
   @@map("refunds")
 }
 
 // =============================================================
 // MODEL: Dispute
 // Trava o acordo e abre processo de mediação.
-// resolvedById pode ser ID de User ou de AdminUser.
+// resolvedByType identifica se quem resolveu foi um User,
+// um AdminUser ou o próprio Sistema.
 // =============================================================
 
 model Dispute {
-  id           String        @id @default(cuid())
-  agreementId  String        @unique
-  openedById   String
-  reason       String
-  description  String
-  status       DisputeStatus @default(OPEN)
-  resolution   String?
-  resolvedById String? // ID do User ou AdminUser que resolveu
-  resolvedAt   DateTime?
-  closedAt     DateTime?
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
+  id             String        @id @default(cuid())
+  agreementId    String        @unique
+  openedById     String
+  reason         String
+  description    String
+  status         DisputeStatus @default(OPEN)
+  resolution     String?
+  resolvedById   String? // ID do User ou AdminUser que resolveu
+  resolvedByType ActorType? // desambigua: USER | ADMIN | SYSTEM
+  resolvedAt     DateTime?
+  closedAt       DateTime?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
 
   agreement Agreement        @relation(fields: [agreementId], references: [id], onDelete: Cascade)
   openedBy  User             @relation(fields: [openedById], references: [id])
@@ -899,6 +972,7 @@ model TrustScoreEvent {
 
   @@index([userId])
   @@index([trustScoreId])
+  @@index([userId, type]) // buscar eventos de um tipo específico por usuário
   @@index([createdAt])
   @@map("trust_score_events")
 }
@@ -907,6 +981,10 @@ model TrustScoreEvent {
 // MODEL: BlockchainRecord
 // Stub para Fase 4. Armazena o hash SHA256 dos termos do acordo
 // e o hash da transação na blockchain após confirmação.
+//
+// proofHash: hash enviado/registrado na blockchain.
+// Diferente de Agreement.contentHash, que é o hash local
+// dos termos calculado antes de qualquer submissão à chain.
 // =============================================================
 
 model BlockchainRecord {
@@ -916,8 +994,8 @@ model BlockchainRecord {
   txHash          String?
   blockNumber     BigInt?
   contractAddress String?
-  proofHash       String? // SHA256 do payload do acordo
-  proofData       Json? // dados usados para gerar o proofHash
+  proofHash       String? // hash registrado na blockchain
+  proofData       Json? // dados que geraram o proofHash
   status          BlockchainRecordStatus @default(PENDING)
   retryCount      Int                    @default(0)
   confirmedAt     DateTime?
