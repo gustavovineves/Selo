@@ -2,13 +2,22 @@
 
 ## Conceito
 
-Uma **Disputa** trava o valor protegido de um acordo `WITH_GUARANTEE` e abre um processo de mediação entre as partes. Enquanto a disputa estiver aberta, nenhum participante pode liberar ou reembolsar o valor — somente um administrador poderá resolver.
+Uma **Disputa** trava o valor protegido de um acordo `WITH_GUARANTEE` e abre um processo de mediação entre as partes. Enquanto a disputa estiver aberta, nenhum participante pode liberar ou reembolsar o valor. No MVP da Fase 6, a resolução é feita por **análise humana do administrador**.
 
 ### O que NÃO é uma disputa no Selo
 
 - Não é um mecanismo de cancelamento de acordo simples
 - Não bloqueia o acordo operacionalmente — apenas o fluxo financeiro
 - Não pune automaticamente nenhuma das partes na abertura
+- Não é resolvida automaticamente pelo sistema nesta fase
+
+### Princípios do produto
+
+- A plataforma **não custodia diretamente** o dinheiro — o parceiro financeiro (Fitbank/BaaS) é o responsável real
+- Enquanto a disputa está aberta, o valor fica **travado em FROZEN_DISPUTE**
+- **O administrador decide** liberar ao recebedor ou reembolsar ao pagador
+- Toda decisão precisa de **justificativa obrigatória** e é registrada em audit log
+- Em produção, a decisão administrativa acionaria o parceiro financeiro/BaaS real — no MVP, é simulado localmente
 
 ---
 
@@ -16,11 +25,11 @@ Uma **Disputa** trava o valor protegido de um acordo `WITH_GUARANTEE` e abre um 
 
 | Status | Descrição |
 |---|---|
-| `OPEN` | Disputa aberta, aguardando revisão |
+| `OPEN` | Disputa aberta, aguardando revisão admin |
 | `UNDER_REVIEW` | Admin está analisando (Fase futura) |
-| `AWAITING_EVIDENCE` | Partes foram solicitadas a enviar evidências |
-| `RESOLVED_FAVOR_CREATOR` | Resolvida a favor do criador (Fase futura) |
-| `RESOLVED_FAVOR_COUNTERPART` | Resolvida a favor da contraparte (Fase futura) |
+| `AWAITING_EVIDENCE` | Partes foram solicitadas a enviar evidências (Fase futura) |
+| `RESOLVED_FAVOR_CREATOR` | Resolvida a favor do criador/pagador — reembolso executado |
+| `RESOLVED_FAVOR_COUNTERPART` | Resolvida a favor da contraparte/recebedor — payout executado |
 | `WITHDRAWN` | Retirada pela parte que abriu |
 | `CLOSED` | Encerrada (após resolução ou expiração) |
 
@@ -34,8 +43,47 @@ Uma **Disputa** trava o valor protegido de um acordo `WITH_GUARANTEE` e abre um 
 | `FinancialGuarantee.status = LOCKED` | `FinancialGuarantee.status = FROZEN_DISPUTE` |
 | Release permitido | **Release bloqueado** (409) |
 | Refund permitido | **Refund bloqueado** (400 — estado financeiro inválido) |
+| confirm-completion permitido | **confirm-completion bloqueado** (409) |
 
-`operationalStatus` permanece `ACTIVE` durante a disputa. Apenas o eixo financeiro é bloqueado.
+`operationalStatus` permanece `AWAITING_CONFIRMATION` durante a disputa. Apenas o eixo financeiro é bloqueado.
+
+---
+
+## Fluxo de Resolução Administrativa (Fase 6)
+
+```
+[DISPUTA ABERTA — POST /agreements/:id/dispute]
+    │   financialStatus → DISPUTED
+    │   FinancialGuarantee → FROZEN_DISPUTE
+    │   Dispute.status = OPEN
+    │   Release, refund e confirm-completion bloqueados
+    ▼
+[ADMIN ANALISA — GET /admin/disputes/:id]
+    │   Admin lê acordo, participantes, garantia, eventos e mensagens
+    │   Admin revisa evidências das partes
+    ▼
+    ┌──[LIBERAR AO RECEBEDOR — POST /admin/disputes/:id/resolve-release]
+    │       Dispute → RESOLVED_FAVOR_COUNTERPART
+    │       FinancialGuarantee → PAID_OUT (releasedAt preenchido)
+    │       Agreement.financialStatus → PAID_OUT
+    │       Agreement.operationalStatus → COMPLETED
+    │       Payout simulado criado (metadata: simulated=true)
+    │       Eventos: DISPUTE_RESOLVED, PAYOUT_INITIATED, PAYOUT_COMPLETED, COMPLETED
+    │       TrustScore: +30 para recebedor, -20 para pagador
+    │       AuditLog: ADMIN_DISPUTE_RESOLVED
+    │       BlockchainRecord: PENDING
+    │
+    └──[REEMBOLSAR AO PAGADOR — POST /admin/disputes/:id/resolve-refund]
+            Dispute → RESOLVED_FAVOR_CREATOR
+            FinancialGuarantee → REFUNDED (revertedAt preenchido)
+            Agreement.financialStatus → REFUNDED
+            Agreement.operationalStatus → CANCELLED
+            Refund simulado criado (metadata: simulated=true)
+            Eventos: DISPUTE_RESOLVED, REFUND_INITIATED, REFUND_COMPLETED, CANCELLED
+            TrustScore: +30 para pagador, -20 para recebedor
+            AuditLog: ADMIN_DISPUTE_RESOLVED
+            BlockchainRecord: PENDING
+```
 
 ---
 
@@ -107,46 +155,140 @@ Adiciona mensagem à disputa.
 | `EVIDENCE` | Envio de evidência (URL no content ou `attachments`) |
 | `SYSTEM_NOTE` | Mensagem automática do sistema |
 | `ADMIN_NOTE` | Nota do admin (Fase futura) |
-| `RESOLUTION` | Mensagem de resolução (Fase futura) |
+| `RESOLUTION` | Mensagem de resolução — gerada automaticamente ao resolver |
 
-**Response 201:**
+---
+
+## Endpoints Administrativos (Fase 6)
+
+**Auth:** Header `X-Admin-Token: <ADMIN_TOKEN>` (env)
+
+> No MVP, autenticação é por token estático. Produção usará `AdminUser` com JWT separado.
+
+---
+
+### `GET /api/v1/admin/disputes`
+
+Lista disputas com dados suficientes para análise.
+
+**Query params:**
+| Param | Tipo | Descrição |
+|---|---|---|
+| `status` | `DisputeStatus` | Filtrar por status (ex: `OPEN`) |
+| `page` | number | Default 1 |
+| `limit` | number | Default 20, máx 100 |
+
+**Response 200:**
 ```json
 {
-  "id": "cm...",
-  "disputeId": "cm...",
-  "senderId": "cm...",
-  "senderType": "USER",
-  "type": "EVIDENCE",
-  "content": "Aqui está o comprovante de entrega.",
-  "attachments": null,
-  "createdAt": "2026-06-04T10:00:00.000Z"
+  "data": [
+    {
+      "id": "cm...",
+      "status": "OPEN",
+      "openedById": "cm...",
+      "reason": "Serviço não entregue",
+      "createdAt": "...",
+      "openedBy": { "id": "cm...", "profile": { "fullName": "João" } },
+      "agreement": {
+        "id": "cm...",
+        "title": "Serviço de design",
+        "amount": "350.00",
+        "financialStatus": "DISPUTED",
+        "financialGuarantee": { "status": "FROZEN_DISPUTE", "amount": "350.00" },
+        "payer": { "profile": { "fullName": "João Pagador" } },
+        "receiver": { "profile": { "fullName": "Maria Recebedora" } }
+      },
+      "_count": { "messages": 3 },
+      "messages": [{ "type": "EVIDENCE", "content": "...", "createdAt": "..." }]
+    }
+  ],
+  "total": 2,
+  "page": 1,
+  "limit": 20
 }
 ```
 
 ---
 
-## Score de Confiança nas Disputas
+### `GET /api/v1/admin/disputes/:id`
 
-| Momento | Evento | Delta | Nota |
-|---|---|---|---|
-| Abertura | `DISPUTE_OPENED` | 0 | Neutro — abridor não é punido |
-| Resolução a favor | `DISPUTE_WON` | +30 | (Fase futura — admin resolve) |
-| Resolução contra | `DISPUTE_LOST` | -50 | (Fase futura — admin resolve) |
+Retorna detalhe completo da disputa para análise admin.
 
-A linguagem preferida do produto é "histórico em evolução", não "score baixo".
+Inclui: acordo completo, participantes, garantia, paymentIntents/pixCharge/payouts/refunds, eventos, mensagens e resolução.
 
 ---
 
-## Resolução de Disputas (Fase Futura)
+### `POST /api/v1/admin/disputes/:id/resolve-release`
 
-A resolução de disputas por admins está prevista para quando o painel admin estiver operacional (Fase 6). Fluxo esperado:
+Resolve a disputa liberando o valor ao recebedor.
 
-1. Admin recebe notificação de disputa aberta
-2. Admin revisa mensagens e evidências
-3. Admin decide a favor de uma das partes
-4. Sistema executa payout ou refund conforme decisão
-5. TrustScore das partes atualizado com `DISPUTE_WON` / `DISPUTE_LOST`
-6. Disputa → `CLOSED`
+**Auth:** `X-Admin-Token`
+
+**Request:**
+```json
+{
+  "reason": "string obrigatória (mín. 10 chars)",
+  "adminNote": "string opcional"
+}
+```
+
+**Regras:**
+- Disputa deve estar `OPEN`
+- Acordo deve ser `WITH_GUARANTEE`
+- Garantia deve estar `FROZEN_DISPUTE`
+- `financialStatus` deve ser `DISPUTED`
+- Payout simulado é criado imediatamente (`status: COMPLETED`)
+- Em produção, acionaria o parceiro financeiro/BaaS para o payout real
+
+**Response 200:** disputa completa com acordo, garantia, eventos e mensagens atualizados
+
+**Erros:**
+- `400` — disputa não está OPEN / acordo sem garantia / garantia no estado incorreto
+- `401` — token admin ausente ou inválido
+- `404` — disputa não encontrada
+
+---
+
+### `POST /api/v1/admin/disputes/:id/resolve-refund`
+
+Resolve a disputa reembolsando o valor ao pagador.
+
+**Auth:** `X-Admin-Token`
+
+**Request:**
+```json
+{
+  "reason": "string obrigatória (mín. 10 chars)",
+  "adminNote": "string opcional"
+}
+```
+
+**Regras:**
+- Mesmas pré-condições de `resolve-release`
+- Refund simulado é criado imediatamente (`status: COMPLETED`)
+- Em produção, acionaria o parceiro financeiro/BaaS para o reembolso real
+
+**Response 200:** disputa completa atualizada
+
+---
+
+## Score de Confiança nas Disputas
+
+| Momento | Evento | Delta | Quem |
+|---|---|---|---|
+| Abertura | `DISPUTE_OPENED` | 0 | Abridor |
+| Resolução a favor | `DISPUTE_WON` | +30 | Quem ganhou |
+| Resolução contra | `DISPUTE_LOST` | -20 (MVP) | Quem perdeu |
+
+> Delta de -20 é conservador para o MVP. Em produção, usar -50 conforme documentado no schema.
+
+---
+
+## Nota sobre Pix/Fitbank
+
+Em ambiente local (MVP), payout e refund são **simulados** — criados com `status=COMPLETED` e `metadata.simulated=true`. Nenhuma chamada a API externa é feita.
+
+Em produção, a decisão administrativa acionaria o parceiro financeiro (Fitbank/BaaS) para executar a transferência real.
 
 ---
 
@@ -155,9 +297,14 @@ A resolução de disputas por admins está prevista para quando o painel admin e
 | Código | Situação |
 |---|---|
 | 400 | Disputa em acordo SIMPLE (não WITH_GUARANTEE) |
-| 400 | financialStatus diferente de FUNDS_HELD |
+| 400 | financialStatus diferente de FUNDS_HELD (abertura) |
+| 400 | Disputa não está OPEN (resolução) |
+| 400 | Garantia não está FROZEN_DISPUTE (resolução) |
 | 400 | disputeRule = NOT_ALLOWED |
+| 400 | reason ausente ou muito curta |
 | 400 | Disputa encerrada (mensagem) |
+| 401 | Token admin ausente ou inválido |
 | 403 | Usuário não é participante |
 | 404 | Disputa não encontrada |
 | 409 | Já existe disputa para este acordo |
+| 409 | Release/confirm-completion bloqueado por disputa aberta |

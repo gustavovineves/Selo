@@ -1,6 +1,6 @@
 # Progresso do Projeto Selo
 
-Última atualização: 2026-06-05 (Fase 5 — fluxo de contestação validado)
+Última atualização: 2026-06-05 (Fase 6 — resolução administrativa de disputas implementada)
 
 ---
 
@@ -34,7 +34,8 @@
 | Acordos com Garantia | ✅ Implementado (Fase 5) |
 | Pagamento Pix (simulado) | ✅ Implementado com simulate-confirmation (Fase 5) |
 | Disputas básicas | ✅ Implementado (Fase 5) |
-| Score de Confiança | ✅ recordEvent implementado (Fase 5) |
+| Resolução admin de disputas | ✅ Implementado (Fase 6) |
+| Score de Confiança | ✅ recordEvent implementado (Fase 5 e 6) |
 | Git local | ✅ Limpo após commit da Fase 4 |
 
 ### Estrutura do monorepo
@@ -250,35 +251,112 @@ Fluxo de contestação validado manualmente:
 
 ---
 
+## 5c. Fase 6 — Resolução Administrativa de Disputas (Implementada)
+
+### Endpoints administrativos disponíveis
+
+| Método | Rota | Auth | Descrição |
+|--------|------|------|-----------|
+| GET | `/api/v1/admin/health` | Admin Token | Health do painel admin |
+| GET | `/api/v1/admin/stats` | Admin Token | Estatísticas gerais |
+| GET | `/api/v1/admin/disputes` | Admin Token | Listar disputas (com filtro por status) |
+| GET | `/api/v1/admin/disputes/:id` | Admin Token | Detalhe completo da disputa |
+| POST | `/api/v1/admin/disputes/:id/resolve-release` | Admin Token | Resolver liberando ao recebedor |
+| POST | `/api/v1/admin/disputes/:id/resolve-refund` | Admin Token | Resolver reembolsando ao pagador |
+
+### O que foi implementado
+
+- `AdminTokenGuard` — autenticação por header `X-Admin-Token` com valor do env `ADMIN_TOKEN`
+- Listagem de disputas com dados completos para análise humana (pager, filtro por status)
+- Detalhe completo: acordo, participantes, garantia, paymentIntents, payouts/refunds, eventos e mensagens
+- `resolve-release`: payout simulado + estados atualizados + eventos + score + blockchain record + audit log
+- `resolve-refund`: refund simulado + estados atualizados + eventos + score + blockchain record + audit log
+- Justificativa obrigatória (mín. 10 chars) em ambas as resoluções
+- Mensagem automática do tipo `RESOLUTION` adicionada à disputa em cada resolução
+- Bloqueio duplo de resolução (HTTP 400 se disputa não está OPEN)
+- Score: DISPUTE_WON (+30) para o vencedor, DISPUTE_LOST (-20, conservador) para o perdedor
+
+### Testes manuais — 2026-06-05
+
+Fluxo A — resolve-release:
+
+- ✅ Disputa aberta em acordo com garantia
+- ✅ Admin lista disputas com status=OPEN
+- ✅ Admin consulta detalhe completo
+- ✅ Admin resolve liberando ao recebedor: HTTP 200
+- ✅ `dispute.status = RESOLVED_FAVOR_COUNTERPART`
+- ✅ `dispute.resolvedByType = ADMIN`
+- ✅ `agreement.operationalStatus = COMPLETED`
+- ✅ `agreement.financialStatus = PAID_OUT`
+- ✅ `guarantee.status = PAID_OUT`, `releasedAt` preenchido
+- ✅ Payout simulado criado com `metadata.simulated=true`
+- ✅ Sequência de eventos: `...DISPUTE_OPENED → DISPUTE_RESOLVED → PAYOUT_INITIATED → PAYOUT_COMPLETED → COMPLETED` (todos com `actorType: ADMIN`)
+- ✅ Mensagem de resolução adicionada à disputa
+- ✅ Resolver novamente bloqueado com HTTP 400
+
+Fluxo B — resolve-refund:
+
+- ✅ Disputa aberta em acordo com garantia
+- ✅ Admin resolve reembolsando ao pagador: HTTP 200
+- ✅ `dispute.status = RESOLVED_FAVOR_CREATOR`
+- ✅ `agreement.operationalStatus = CANCELLED`
+- ✅ `agreement.financialStatus = REFUNDED`
+- ✅ `guarantee.status = REFUNDED`, `revertedAt` preenchido
+- ✅ Refund simulado criado com `metadata.simulated=true`
+- ✅ Eventos: `...DISPUTE_RESOLVED → REFUND_INITIATED → REFUND_COMPLETED → CANCELLED` (todos ADMIN)
+- ✅ Resolver novamente bloqueado com HTTP 400
+
+Testes negativos:
+
+- ✅ Sem token admin → 401
+- ✅ Token admin errado → 401
+- ✅ JWT de usuário comum → 401 (sem x-admin-token)
+- ✅ Resolve sem reason → 400
+- ✅ Resolve com reason curta → 400
+- ✅ Disputa inexistente → 404
+- ✅ `release` bloqueado com disputa aberta → 409
+- ✅ `confirm-completion` bloqueado com disputa aberta → 409
+- ✅ `refund` bloqueado com disputa aberta → 400
+
+### Decisões desta fase
+
+- **Auth admin via token estático**: `X-Admin-Token: <ADMIN_TOKEN do env>`. MVP pragmático — produção usará `AdminUser` com JWT separado.
+- **`requestedById` do Refund usa `payerId`**: o campo é FK para `User`, então o admin não pode ser o requestor sem migration. Semântica preservada: o reembolso vai ao pagador.
+- **DISPUTE_LOST delta conservador (-20)**: o score padrão do schema é -50, mas no MVP usamos -20. A linguagem preferida do produto é "histórico em evolução", não punição pesada.
+- **Sem migration**: o schema já continha todos os campos necessários (`resolvedById`, `resolvedByType`, `resolvedAt`, `closedAt`, `resolution`, `RESOLVED_FAVOR_CREATOR`, `RESOLVED_FAVOR_COUNTERPART`, `ADMIN_DISPUTE_RESOLVED`, etc.).
+- **Pix continua simulado**: `resolveRelease` e `resolveRefund` criam registros com `metadata.simulated=true`. Em produção, acionariam o Fitbank/BaaS.
+
+---
+
 ## 5. O Que NÃO Foi Implementado Ainda
 
 Os módulos abaixo existem como stubs (`NotImplementedException`) e aguardam as fases futuras:
 
 | Funcionalidade | Fase | Módulo |
 |---|---|---|
-| Destinos de recebimento (ReceivingDestination) | Fase 6 | `receiving-destinations` |
-| Resolução de disputas por admin | Fase 6 | `disputes` + `admin` |
-| Integração real Fitbank/BaaS | Fase 6 | `pix` + `payments` |
-| Webhook real do PSP | Fase 6 | `pix` |
-| Blockchain (submissão real) | Fase 6 | `blockchain-records` |
-| Painel Admin funcional | Fase 6 | `admin` + `apps/admin` |
-| Notificações push | Fase 6 | `notifications` |
+| Destinos de recebimento (ReceivingDestination) | Fase 7 | `receiving-destinations` |
+| Integração real Fitbank/BaaS | Fase 7 | `pix` + `payments` |
+| Webhook real do PSP | Fase 7 | `pix` |
+| Blockchain (submissão real) | Fase 7 | `blockchain-records` |
+| Painel Admin funcional (Next.js) | Fase 7 | `apps/admin` |
+| Notificações push | Fase 7 | `notifications` |
+| Auth admin real (AdminUser + JWT) | Fase 7 | `admin` |
 
 ---
 
 ## 6. Próxima Fase
 
-### Fase 6 — Integração Real e Painel Admin
+### Fase 7 — Integração Real e Painel Admin
 
-Objetivo: substituir simulações por integrações reais e habilitar o painel administrativo.
+Objetivo: substituir simulações por integrações reais e construir o painel administrativo completo.
 
 O que implementar:
 - Integração Fitbank/BaaS real: cobrança Pix, payout, reembolso
 - Webhook real de confirmação do PSP (`POST /webhooks/pix/confirmation`)
 - `ReceivingDestination` — destinos de recebimento do usuário para payout
-- Resolução de disputas via painel admin
+- Auth admin real: login de `AdminUser` com JWT separado
+- Painel Admin (`apps/admin`) funcional — lista disputas, resolve, vê acordos
 - Submissão real à blockchain (Ethereum/Polygon testnet)
-- Painel Admin (`apps/admin`) funcional com autenticação separada
 - Notificações push (Expo Notifications)
 
 Não implementar ainda: Fitbank produção, mainnet blockchain, KYC completo.

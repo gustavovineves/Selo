@@ -68,7 +68,14 @@ Um **Acordo com Garantia** (`type: WITH_GUARANTEE`) é um combinado em que o pag
     │       FinancialGuarantee → FROZEN_DISPUTE
     │       financialStatus → DISPUTED
     │       operationalStatus permanece AWAITING_CONFIRMATION
-    │       Release e refund bloqueados até resolução admin
+    │       Release, refund e confirm-completion bloqueados até resolução admin
+    │
+    │   [RESOLUÇÃO ADMIN — POST /admin/disputes/:id/resolve-release  OU  resolve-refund]
+    │       Admin analisa evidências e decide
+    │       resolve-release → Payout simulado + COMPLETED + PAID_OUT
+    │       resolve-refund  → Refund simulado + CANCELLED + REFUNDED
+    │       TrustScore atualizado para ambas as partes
+    │       AuditLog + BlockchainRecord PENDING registrados
     │
     └──[REEMBOLSO — POST /agreements/:id/refund]  (só antes da 1ª confirmação)
             Refund criado e simulado como concluído
@@ -87,7 +94,9 @@ Um **Acordo com Garantia** (`type: WITH_GUARANTEE`) é um combinado em que o pag
 | AWAITING_CONFIRMATION | FUNDS_HELD | `confirm-completion` (2ª) | → COMPLETED + PAID_OUT (auto-payout) |
 | AWAITING_CONFIRMATION | FUNDS_HELD | `dispute` | financialStatus → DISPUTED |
 | AWAITING_CONFIRMATION | FUNDS_HELD | `refund` | ❌ Bloqueado — use /dispute |
-| \* | DISPUTED | qualquer | ❌ Bloqueado até admin resolver |
+| \* | DISPUTED | qualquer (user) | ❌ Bloqueado até admin resolver |
+| \* | DISPUTED | `resolve-release` (admin) | → COMPLETED + PAID_OUT |
+| \* | DISPUTED | `resolve-refund` (admin) | → CANCELLED + REFUNDED |
 
 ---
 
