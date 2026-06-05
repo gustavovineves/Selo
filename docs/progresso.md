@@ -1,6 +1,6 @@
 # Progresso do Projeto Selo
 
-Última atualização: 2026-06-04 (Fase 4)
+Última atualização: 2026-06-05 (Fase 5 — fluxo de contestação validado)
 
 ---
 
@@ -30,7 +30,11 @@
 | Prisma Client | ✅ Gerado |
 | Auth / Usuários / Sessão | ✅ Implementado (Fase 2) |
 | Chave de Recebimento do App | ✅ Implementado (Fase 3) |
-| Acordos Simples | ✅ Implementado (Fase 4) |
+| Acordos Simples | ✅ Implementado e testado manualmente (Fase 4) |
+| Acordos com Garantia | ✅ Implementado (Fase 5) |
+| Pagamento Pix (simulado) | ✅ Implementado com simulate-confirmation (Fase 5) |
+| Disputas básicas | ✅ Implementado (Fase 5) |
+| Score de Confiança | ✅ recordEvent implementado (Fase 5) |
 | Git local | ✅ Limpo após commit da Fase 4 |
 
 ### Estrutura do monorepo
@@ -151,12 +155,98 @@ AWAITING_ACCEPTANCE → (recusa/cancelamento) → CANCELLED
 ACTIVE → (cancelamento) → CANCELLED
 ```
 
+### Testes manuais — 2026-06-04
+
+Fluxo positivo e negativo testados manualmente:
+
+- ✅ Criação, listagem, detalhe, aceite, conclusão, histórico de eventos
+- ✅ Recusa pela contraparte
+- ✅ Cancelamento pelo criador enquanto aguarda aceite
+- ✅ Tentativa de aceitar acordo cancelado → retorna 400
+- ✅ Tentativa de acessar acordo de outro usuário → retorna 403
+- ✅ Filtro por `status=ACTIVE` e `status=COMPLETED`
+
 ### Decisões desta fase
 
-- `decline` usa `CANCELLED` como status final do acordo (não existe `DECLINED` no enum). Participante recusante recebe `status: REJECTED`.
+- **`decline` gera evento `REJECTED`, mas o status operacional do acordo fica `CANCELLED`**: a recusa encerra o acordo antes do aceite. Não existe `DECLINED` no enum `AgreementOperationalStatus`. O evento `REJECTED` e o `status: REJECTED` no participante distinguem a recusa de um cancelamento comum no histórico — mesmo que o status final seja idêntico.
 - `confirmationRule = SINGLE_PARTY` é o default: qualquer participante pode concluir o acordo.
 - Acordos simples **não têm dinheiro**, então cancelamento em `ACTIVE` é permitido para qualquer participante.
 - Schema **não foi alterado**. Nenhuma migration nova foi necessária.
+
+---
+
+## 5b. Fase 5 — Acordos com Garantia (Implementada)
+
+### Endpoints disponíveis
+
+| Método | Rota | Auth | Descrição |
+|--------|------|------|-----------|
+| POST | `/api/v1/agreements/guaranteed` | JWT | Criar acordo com garantia |
+| POST | `/api/v1/agreements/:id/payment-intents` | JWT | Iniciar depósito Pix |
+| POST | `/api/v1/payments/:id/simulate-confirmation` | JWT | Simular confirmação do parceiro (dev) |
+| POST | `/api/v1/agreements/:id/confirm-completion` | JWT | Confirmar conclusão (dupla confirmação) |
+| POST | `/api/v1/agreements/:id/release` | JWT | Liberar valor (após dupla confirmação ou admin) |
+| POST | `/api/v1/agreements/:id/refund` | JWT | Reembolsar valor ao pagador |
+| POST | `/api/v1/agreements/:id/dispute` | JWT | Abrir disputa e travar valor |
+| GET | `/api/v1/agreements/:id/dispute` | JWT | Detalhe da disputa |
+| GET | `/api/v1/agreements/:id/guarantee` | JWT | Estado da garantia financeira |
+| GET | `/api/v1/financial-guarantees/:id` | JWT | Garantia por ID direto |
+| GET | `/api/v1/disputes/:id` | JWT | Disputa por ID direto |
+| POST | `/api/v1/disputes/:id/messages` | JWT | Adicionar mensagem à disputa |
+
+### O que foi implementado
+
+- Acordo com garantia criado com `confirmationRule = MANUAL` (dupla confirmação obrigatória)
+- `FinancialGuarantee.status = AWAITING_PAYMENT` na criação
+- Aceite funciona igual ao acordo simples → `operationalStatus → ACTIVE`
+- Iniciação de pagamento: cria `PaymentIntent` + `PixCharge` com QR Code simulado
+- Simulação de confirmação do parceiro financeiro: `FUNDS_HELD`
+- **Dupla confirmação**: `POST /confirm-completion` por qualquer participante
+  - 1ª confirmação: `operationalStatus → AWAITING_CONFIRMATION`, evento `CONFIRMED` + `CONFIRMATION_REQUESTED`
+  - 2ª confirmação: payout automático → `COMPLETED + PAID_OUT`, TrustScore +20 para ambos
+- Release manual: funciona apenas se ambas as partes já confirmaram via `/confirm-completion`
+- Refund: bloqueado em `AWAITING_CONFIRMATION` (uma parte já confirmou — use /dispute)
+- Disputa: pode ser aberta de `ACTIVE` ou `AWAITING_CONFIRMATION` enquanto `financialStatus = FUNDS_HELD`
+- `TrustScoreService.recordEvent()` — atualiza score e cria evento imutável
+- `BlockchainRecord.status = PENDING` criado em events chave (confirmação, release)
+- `AuditLog` registrado em todas as ações financeiras críticas
+- `findOne()` e `findAllByUser()` retornam `financialGuarantee` e `dispute` resumidos
+- `cancel()` protege contra cancelamento quando `FUNDS_HELD`
+- `complete()` redireciona para `/confirm-completion` em acordos WITH_GUARANTEE
+
+### Testes manuais — 2026-06-05
+
+Fluxo de contestação validado manualmente:
+
+- ✅ Acordo criado com `confirmationRule = MANUAL`
+- ✅ Aceite, pagamento e `simulate-confirmation` → `FUNDS_HELD`, `FinancialGuarantee = LOCKED`
+- ✅ A confirma cumprimento → `operationalStatus = AWAITING_CONFIRMATION`, `financialStatus = FUNDS_HELD`
+- ✅ B abre disputa em vez de confirmar → `financialStatus = DISPUTED`, `guarantee = FROZEN_DISPUTE`, `dispute.status = OPEN`
+- ✅ `release` bloqueado com 409 + mensagem clara "Existe uma disputa em aberto"
+- ✅ `confirm-completion` bloqueado com 409 + mensagem clara "Existe uma disputa em aberto"
+- ✅ `refund` bloqueado com 400 (financialStatus = DISPUTED, não FUNDS_HELD)
+- ✅ Garantia: `FROZEN_DISPUTE`, `releasedAt = null`, `revertedAt = null`
+- ✅ Disputa: `OPEN`, `openedById = B`
+- ✅ Mensagem de evidência adicionada à disputa com sucesso
+- ✅ Sequência de eventos: `CREATED → SENT → ACCEPTED → PAYMENT_REQUESTED → FUNDS_LOCKED → CONFIRMED → CONFIRMATION_REQUESTED → DISPUTE_OPENED`
+
+### Bug corrigido na validação — 2026-06-05
+
+`release()` e `confirmCompletion()` checavam `financialStatus !== FUNDS_HELD` antes de checar disputas abertas. Após `openDispute()`, o `financialStatus` muda para `DISPUTED`, fazendo os bloqueios retornarem HTTP 400 com mensagem "O valor precisa estar protegido" — enganosa, pois o valor ESTAVA protegido (em `FROZEN_DISPUTE`).
+
+**Correção**: ordem das checagens invertida — disputa verificada antes do `financialStatus`. Agora retornam 409 com mensagem clara. Build passou limpo.
+
+### Decisões desta fase
+
+- **`confirmationRule = MANUAL` é padrão para WITH_GUARANTEE**: significa dupla confirmação obrigatória. A lógica está no serviço, sem necessidade de alterar o enum do schema. `SINGLE_PARTY` existe mas não é o default.
+- **Dupla confirmação via `AgreementEvent.CONFIRMED`**: rastreada pelos registros de eventos existentes (sem novo campo no schema). O serviço conta eventos `CONFIRMED` por participante antes de permitir release.
+- **`AWAITING_CONFIRMATION` usa o enum existente**: perfeito para "esperando o segundo confirmador". A enum `AgreementOperationalStatus.AWAITING_CONFIRMATION` já existia no schema.
+- **Dispute não muda operationalStatus**: apenas `financialStatus → DISPUTED`. Os dois eixos são independentes.
+- **Refund bloqueado em AWAITING_CONFIRMATION**: uma parte confirmou conclusão, então reembolso unilateral seria injusto. A outra parte deve usar `/dispute`.
+- **score -10 no refund (não -30 como em cancelamento simples)**: reembolso pode ser legítimo. Punição leve, documentada.
+- **simulate-confirmation é dev-only**: em produção virá como webhook do PSP.
+- **Sem migration**: o schema já continha todos os models necessários. Nenhuma alteração no Prisma.
+- **Verificação de disputa antes de financialStatus em release/confirmCompletion**: garante que o erro 409 seja retornado com mensagem clara quando há disputa, em vez do genérico 400 do check financeiro.
 
 ---
 
@@ -166,33 +256,32 @@ Os módulos abaixo existem como stubs (`NotImplementedException`) e aguardam as 
 
 | Funcionalidade | Fase | Módulo |
 |---|---|---|
-| Destinos de recebimento | Fase 5 | `receiving-destinations` |
-| Acordos com garantia | Fase 5 | `agreements` + `financial-guarantees` |
-| Pix (cobrança e payout) | Fase 5 | `pix` + `payments` |
-| Score de confiança | Fase 5 | `trust-score` |
-| Disputas | Fase 5 | `disputes` |
-| Blockchain (prova) | Fase 6 | `blockchain-records` |
-| Fitbank / BaaS | Fase 6 | `pix` + `payments` |
-| Painel Admin | Fase 6 | `admin` + `apps/admin` |
+| Destinos de recebimento (ReceivingDestination) | Fase 6 | `receiving-destinations` |
+| Resolução de disputas por admin | Fase 6 | `disputes` + `admin` |
+| Integração real Fitbank/BaaS | Fase 6 | `pix` + `payments` |
+| Webhook real do PSP | Fase 6 | `pix` |
+| Blockchain (submissão real) | Fase 6 | `blockchain-records` |
+| Painel Admin funcional | Fase 6 | `admin` + `apps/admin` |
+| Notificações push | Fase 6 | `notifications` |
 
 ---
 
 ## 6. Próxima Fase
 
-### Fase 5 — Acordos com Garantia e Score de Confiança
+### Fase 6 — Integração Real e Painel Admin
 
-Objetivo: permitir acordos que travam dinheiro e calcular score de confiança a partir do histórico.
+Objetivo: substituir simulações por integrações reais e habilitar o painel administrativo.
 
 O que implementar:
-- Acordos com `type: WITH_GUARANTEE`
-- `FinancialGuarantee` — trava de valor no acordo
-- `PaymentIntent` e `PixCharge` — stub de cobrança (integração Pix real na Fase 6)
-- `Payout` — stub de liberação de valor
-- Cálculo e atualização de `TrustScore` após conclusão/cancelamento/disputa
-- `Dispute` — abertura e resolução básica de disputas
-- `ReceivingDestination` — destinos de pagamento salvos pelo usuário
+- Integração Fitbank/BaaS real: cobrança Pix, payout, reembolso
+- Webhook real de confirmação do PSP (`POST /webhooks/pix/confirmation`)
+- `ReceivingDestination` — destinos de recebimento do usuário para payout
+- Resolução de disputas via painel admin
+- Submissão real à blockchain (Ethereum/Polygon testnet)
+- Painel Admin (`apps/admin`) funcional com autenticação separada
+- Notificações push (Expo Notifications)
 
-Não implementar ainda: Fitbank real, blockchain, mobile, admin.
+Não implementar ainda: Fitbank produção, mainnet blockchain, KYC completo.
 
 ---
 
@@ -253,6 +342,9 @@ Invoke-RestMethod -Uri "http://localhost:3000/api/v1/receiving-keys/resolve/dev"
 | [docs/auth.md](auth.md) | Autenticação: endpoints, exemplos, fluxo futuro OTP |
 | [docs/receiving-keys.md](receiving-keys.md) | Chave de Recebimento do App: conceito, endpoints, regras, exemplos |
 | [docs/agreements.md](agreements.md) | Acordos Simples: ciclo de vida, endpoints, regras, exemplos PowerShell |
+| [docs/guaranteed-agreements.md](guaranteed-agreements.md) | Acordos com Garantia: fluxo financeiro, endpoints, simulação, PowerShell |
+| [docs/payments.md](payments.md) | Pagamentos: PaymentIntent, PixCharge, simulate-confirmation, dev vs. produção |
+| [docs/disputes.md](disputes.md) | Disputas: abertura, mensagens, score, resolução futura |
 | [docs/database.md](database.md) | Todos os 22 models e 37 enums do schema Prisma |
 | [docs/modules.md](modules.md) | Endpoints de todos os módulos do backend |
 | [docs/getting-started.md](getting-started.md) | Setup inicial do ambiente |

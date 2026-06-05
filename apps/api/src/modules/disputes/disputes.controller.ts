@@ -1,9 +1,9 @@
-import { Controller, Get, Post, Patch, Param, Body, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Param, Body, UseGuards } from '@nestjs/common';
 import { DisputesService } from './disputes.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
-import { CreateDisputeDto } from './dto/create-dispute.dto';
-import { ResolveDisputeDto } from './dto/resolve-dispute.dto';
+import { AuthenticatedUser } from '../auth/strategies/jwt.strategy';
+import { AddDisputeMessageDto } from './dto/add-dispute-message.dto';
 
 @Controller('disputes')
 @UseGuards(JwtAuthGuard)
@@ -11,24 +11,16 @@ export class DisputesController {
   constructor(private readonly service: DisputesService) {}
 
   @Get(':id')
-  findOne(@CurrentUser() user: { id: string }, @Param('id') id: string) {
+  findOne(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
     return this.service.findOne(user.id, id);
   }
 
-  @Post()
-  create(
-    @CurrentUser() user: { id: string },
-    @Body() dto: CreateDisputeDto,
-  ) {
-    return this.service.create(user.id, dto);
-  }
-
-  @Patch(':id/resolve')
-  resolve(
-    @CurrentUser() user: { id: string },
+  @Post(':id/messages')
+  addMessage(
+    @CurrentUser() user: AuthenticatedUser,
     @Param('id') id: string,
-    @Body() dto: ResolveDisputeDto,
+    @Body() dto: AddDisputeMessageDto,
   ) {
-    return this.service.resolve(user.id, id, dto);
+    return this.service.addMessage(user.id, id, dto);
   }
 }

@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException, NotImplementedException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 
 @Injectable()
@@ -13,12 +14,29 @@ export class BlockchainRecordsService {
     return record;
   }
 
+  // Cria registro local pendente. Submissão real à blockchain: Fase 6.
+  async createPending(
+    agreementId: string,
+    proofData: Record<string, unknown>,
+  ): Promise<void> {
+    await this.prisma.blockchainRecord.upsert({
+      where: { agreementId },
+      create: {
+        agreementId,
+        proofData: proofData as Prisma.InputJsonValue,
+        status: 'PENDING',
+      },
+      update: {
+        proofData: proofData as Prisma.InputJsonValue,
+      },
+    });
+  }
+
   createProof(_agreementId: string) {
-    // TODO: Fase 4 — gerar hash SHA256 e submeter à blockchain
-    throw new NotImplementedException('Blockchain records — Fase 4');
+    throw new NotImplementedException('Blockchain proof generation — Fase 6');
   }
 
   submitToChain(_agreementId: string) {
-    throw new NotImplementedException('Blockchain submission — Fase 4');
+    throw new NotImplementedException('Blockchain submission — Fase 6');
   }
 }

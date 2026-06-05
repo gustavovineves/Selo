@@ -53,7 +53,12 @@ COMPLETED
 | COMPLETED | — | — | Imutável |
 | CANCELLED | — | — | Imutável |
 
-> **Nota:** `decline` usa `CANCELLED` como status final do acordo (não existe `DECLINED` no enum atual). O participante que recusou terá `status: REJECTED` no modelo `AgreementParticipant`.
+> **Nota sobre recusa:** Quando a contraparte recusa (`decline`), dois registros são gerados simultaneamente:
+> - O **evento** (`AgreementEvent`) registrado é do tipo `REJECTED` — identifica que foi uma recusa, não um cancelamento.
+> - O **status operacional** final do acordo (`Agreement.operationalStatus`) fica `CANCELLED` — pois a recusa encerra o acordo antes do aceite, e não existe o estado `DECLINED` no enum.
+> - O **participante** recusante terá `AgreementParticipant.status: REJECTED`.
+>
+> Portanto: evento = `REJECTED`, acordo = `CANCELLED`. Esse comportamento foi validado em teste manual.
 
 ---
 
@@ -407,6 +412,15 @@ $body = '{"reason":"Não consigo ir até lá."}'
 Invoke-RestMethod -Uri "http://localhost:3000/api/v1/agreements/$id2/decline" -Method Post `
   -Headers @{ Authorization = "Bearer $tokenB" } `
   -Body $body -ContentType "application/json" | ConvertTo-Json -Depth 3
+
+# Resultado esperado:
+# acordo.operationalStatus = "CANCELLED"   ← o acordo está encerrado
+# participante B: status = "REJECTED"      ← identifica que foi uma recusa
+# evento registrado: type = "REJECTED"     ← evento distinto de CANCELLED
+
+# Ver eventos para confirmar o tipo correto
+Invoke-RestMethod -Uri "http://localhost:3000/api/v1/agreements/$id2/events" `
+  -Headers @{ Authorization = "Bearer $tokenA" } | ConvertTo-Json -Depth 5
 ```
 
 ### Testar cancelamento (novo acordo)
@@ -464,6 +478,41 @@ Invoke-RestMethod -Uri "http://localhost:3000/api/v1/agreements?status=COMPLETED
 | 404 | Chave não encontrada | Chave da contraparte não encontrada ou inativa. |
 | 409 | Já aceito | Este acordo já foi aceito. |
 | 409 | Prazo de aceite expirado | O prazo de aceite deste acordo expirou. |
+
+---
+
+## Histórico de Testes Manuais
+
+### Status: ✅ Testado manualmente em 2026-06-04
+
+| Fluxo | Resultado |
+|---|---|
+| Criar acordo simples (A → B) | ✅ OK — 201 com `operationalStatus: AWAITING_ACCEPTANCE` |
+| Listar acordos do criador (A) | ✅ OK — aparece na listagem |
+| Listar acordos da contraparte (B) | ✅ OK — aparece na listagem |
+| Ver detalhe do acordo (B) | ✅ OK — participantes e perfis retornados |
+| Aceitar acordo (B aceita) | ✅ OK — status vai para `ACTIVE`, evento `ACCEPTED` registrado |
+| Concluir acordo (A conclui) | ✅ OK — status vai para `COMPLETED`, evento `COMPLETED` registrado |
+| Ver histórico de eventos | ✅ OK — sequência `CREATED → SENT → ACCEPTED → COMPLETED` |
+| **Recusar acordo (B recusa)** | ✅ OK — evento `REJECTED`, acordo `CANCELLED`, participante `REJECTED` |
+| Cancelar enquanto aguarda aceite (A cancela) | ✅ OK — status vai para `CANCELLED`, evento `CANCELLED` |
+| Tentar aceitar acordo já cancelado | ✅ OK — retorna `400` |
+| Filtrar acordos por `status=ACTIVE` | ✅ OK |
+| Filtrar acordos por `status=COMPLETED` | ✅ OK |
+| Tentar acessar acordo de outro usuário | ✅ OK — retorna `403` |
+| Criar acordo consigo mesmo | ✅ OK — retorna `400` |
+
+### Comportamento confirmado: recusa vs. cancelamento
+
+A recusa pela contraparte e o cancelamento são **semanticamente distintos**, mas compartilham o mesmo status operacional final (`CANCELLED`). A diferença está nos registros de evento e participante:
+
+| Ação | `AgreementEvent.type` | `Agreement.operationalStatus` | `AgreementParticipant.status` |
+|---|---|---|---|
+| Contraparte recusa | `REJECTED` | `CANCELLED` | `REJECTED` (apenas a contraparte) |
+| Criador cancela (em AWAITING) | `CANCELLED` | `CANCELLED` | sem alteração |
+| Qualquer um cancela (em ACTIVE) | `CANCELLED` | `CANCELLED` | sem alteração |
+
+Essa distinção permite que o histórico de eventos identifique **por que** um acordo foi encerrado, mesmo que o status final seja o mesmo.
 
 ---
 

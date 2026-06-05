@@ -1,24 +1,21 @@
-import { Controller, Get, Post, Param, Body, UseGuards } from '@nestjs/common';
+import { Controller, Post, Param, UseGuards, HttpCode, HttpStatus } from '@nestjs/common';
 import { PaymentsService } from './payments.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
-import { CreatePaymentDto } from './dto/create-payment.dto';
+import { AuthenticatedUser } from '../auth/strategies/jwt.strategy';
 
 @Controller('payments')
 @UseGuards(JwtAuthGuard)
 export class PaymentsController {
   constructor(private readonly service: PaymentsService) {}
 
-  @Get(':id')
-  findOne(@CurrentUser() user: { id: string }, @Param('id') id: string) {
-    return this.service.findOne(user.id, id);
-  }
-
-  @Post()
-  create(
-    @CurrentUser() user: { id: string },
-    @Body() dto: CreatePaymentDto,
+  // Endpoint de dev/local: simula confirmação do parceiro financeiro (Fitbank/BaaS)
+  @Post(':id/simulate-confirmation')
+  @HttpCode(HttpStatus.OK)
+  simulateConfirmation(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') paymentIntentId: string,
   ) {
-    return this.service.create(user.id, dto);
+    return this.service.simulateConfirmation(user.id, paymentIntentId);
   }
 }
