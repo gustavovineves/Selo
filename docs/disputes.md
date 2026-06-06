@@ -311,6 +311,43 @@ Em produção, a decisão administrativa acionaria o parceiro financeiro (Fitban
 
 ---
 
+## Painel Admin Web (Fase 15)
+
+A partir da Fase 15, o administrador pode operar disputas diretamente pelo painel web em `apps/admin`, sem precisar de Postman ou curl.
+
+### Telas disponíveis
+
+| Rota | Função |
+|---|---|
+| `/login` | Entrada no painel via X-Admin-Token |
+| `/dashboard` | Estatísticas gerais + alerta de contestações abertas |
+| `/disputes` | Lista com filtros por status + paginação |
+| `/disputes/[id]` | Detalhe completo + modais de resolução |
+
+### Fluxo de resolução pelo painel
+
+1. Admin acessa `/disputes?status=OPEN`
+2. Clica em "Analisar →" em uma contestação
+3. Lê os 6 blocos: resumo, acordo, participantes, valor protegido, evidências, histórico
+4. Clica em "Liberar ao recebedor" ou "Reembolsar pagador"
+5. Modal abre: confirma a decisão com justificativa obrigatória (≥10 chars)
+6. Painel chama o endpoint correto; contestação é encerrada; página recarrega com status atualizado
+
+### Terminologia no painel
+
+Os `DisputeMessage` do backend são exibidos como **Evidências e registros formais** — nunca como "chat" ou "mensagens".
+
+### Como rodar o painel
+
+```bash
+cp apps/admin/.env.example apps/admin/.env.local
+pnpm dev:admin   # http://localhost:3001
+```
+
+Ver [docs/admin.md](admin.md) para documentação completa.
+
+---
+
 ## Contestação no App Mobile (Fase 11)
 
 ### O que é e o que não é

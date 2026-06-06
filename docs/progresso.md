@@ -1,6 +1,6 @@
 # Progresso do Projeto Selo
 
-Última atualização: 2026-06-06 (Fase 14 — Notificações In-App e Central de Atividades)
+Última atualização: 2026-06-06 (Fase 15 — Painel Admin Visual Web para Operação de Disputas)
 
 ---
 
@@ -43,6 +43,7 @@
 | App Mobile (Perfil, Chave, Destino de Recebimento) | ✅ Implementado (Fase 12) |
 | App Mobile (Refresh JWT, Interceptor 401, Erros Globais) | ✅ Implementado (Fase 13) |
 | App Mobile (Notificações In-App, Central de Atividades, Badge) | ✅ Implementado (Fase 14) |
+| Painel Admin Web — Operação de Disputas | ✅ Implementado (Fase 15) |
 | Score de Confiança | ✅ recordEvent implementado (Fase 5 e 6) |
 | Git local | ✅ Limpo após commit da Fase 4 |
 
@@ -653,9 +654,9 @@ Os módulos abaixo existem como stubs (`NotImplementedException`) ou aguardam as
 | Integração real Fitbank/BaaS | Futuro | `pix` + `payments` |
 | Webhook real do PSP | Futuro | `pix` |
 | Blockchain (submissão real) | Futuro | `blockchain-records` |
-| Painel Admin funcional (Next.js) | Futuro | `apps/admin` |
+| Painel Admin funcional (Next.js) — operação de disputas | ✅ Implementado (Fase 15) | `apps/admin` |
 | Push notifications reais (Expo Notifications) | Futuro | `notifications` |
-| Auth admin real (AdminUser + JWT) | Futuro | `admin` |
+| Auth admin real (AdminUser + JWT) | Futuro | `admin` — atualmente por X-Admin-Token provisório |
 | Upload de arquivo como evidência de contestação | Futuro | `apps/mobile` |
 | Upload de avatar | Futuro | `apps/mobile` |
 
@@ -754,9 +755,78 @@ Os módulos abaixo existem como stubs (`NotImplementedException`) ou aguardam as
 
 ---
 
+## 5j. Fase 15 — Painel Admin Visual Web para Operação de Disputas (Implementada)
+
+### O que foi implementado
+
+- **Painel admin web funcional** em `apps/admin` (Next.js 14, App Router, TypeScript)
+- **Autenticação admin provisória**: tela `/login` com campo de token; valida contra `GET /admin/health`; token salvo em `localStorage`; logout limpa token; 401/403 da API redireciona automaticamente para login
+- **Dashboard** (`/dashboard`): cards de estatísticas (usuários, combinados, contestações totais, contestações abertas); banner de alerta para contestações abertas com link direto; atalhos de navegação
+- **Lista de contestações** (`/disputes`): tabela responsiva com filtros por status (chips); colunas com status badge semântico, acordo/valor, pagador→recebedor, data; contestações abertas destacadas em âmbar; paginação
+- **Detalhe da contestação** (`/disputes/[id]`): 6 blocos de informação (resumo, acordo, participantes, valor protegido, evidências formais, histórico de eventos); timeline cronológica de eventos; ações administrativas visíveis apenas para contestações abertas
+- **Modais de ação** com justificativa obrigatória (≥10 chars): "Liberar ao recebedor" e "Reembolsar pagador"; confirmação antes de executar; erro claro se backend recusar
+- **Terminologia administrativa**: registros das partes são chamados de "Evidências e registros formais" (nunca "chat" ou "mensagens")
+- **Cliente HTTP admin**: `src/lib/api.ts` com baseURL via env, X-Admin-Token em todas as chamadas, tratamento de 401/403, erros amigáveis
+- **StatusBadge**: cobre 4 dimensões (dispute, financial, guarantee, operational) com todas as variantes de status do Prisma
+
+### Arquivos criados
+
+| Arquivo | Descrição |
+|---|---|
+| `apps/admin/src/lib/types.ts` | Tipos TypeScript alinhados com respostas do backend |
+| `apps/admin/src/lib/api.ts` | Cliente HTTP com X-Admin-Token, tratamento 401, `ApiError` |
+| `apps/admin/src/components/AdminLayout.tsx` | Sidebar + navegação (Dashboard, Contestações, Sair) |
+| `apps/admin/src/components/Modal.tsx` | Modal de confirmação reutilizável com backdrop |
+| `apps/admin/src/components/StatusBadge.tsx` | Badge semântico para 4 tipos de status |
+| `apps/admin/src/app/login/page.tsx` | Tela de login com token admin |
+| `apps/admin/src/app/dashboard/page.tsx` | Dashboard com stats e alertas |
+| `apps/admin/src/app/disputes/page.tsx` | Lista de contestações com filtros e paginação |
+| `apps/admin/src/app/disputes/[id]/page.tsx` | Detalhe completo + modais de resolução |
+| `apps/admin/.env.example` | Variáveis de ambiente do painel |
+| `docs/admin.md` | Documentação completa do painel admin |
+
+### Arquivos alterados
+
+| Arquivo | O que mudou |
+|---|---|
+| `apps/admin/src/app/layout.tsx` | Reset CSS global; metadata atualizado |
+| `apps/admin/src/app/page.tsx` | Redirect para /login ou /dashboard baseado em token |
+
+### Endpoints consumidos
+
+| Método | Rota | Tela |
+|---|---|---|
+| GET | `/api/v1/admin/health` | Login (validação do token) |
+| GET | `/api/v1/admin/stats` | Dashboard |
+| GET | `/api/v1/admin/disputes` | Lista de contestações |
+| GET | `/api/v1/admin/disputes/:id` | Detalhe da contestação |
+| POST | `/api/v1/admin/disputes/:id/resolve-release` | Modal "Liberar ao recebedor" |
+| POST | `/api/v1/admin/disputes/:id/resolve-refund` | Modal "Reembolsar pagador" |
+
+### Confirmações obrigatórias
+
+- Schema Prisma não foi alterado
+- Migration não foi rodada
+- Commit não foi feito
+- Fitbank não integrado (payout/refund simulados)
+- Pix real não implementado
+- Blockchain real não implementada
+- KYC não implementado
+- Push notifications reais não implementadas
+- Chat não implementado
+- Nenhuma regra financeira foi alterada
+- Nenhum dinheiro real é movimentado
+
+### Validação
+
+- `pnpm --filter @selo/admin typecheck` → ✅ Exit 0
+- `pnpm --filter @selo/api build` → ✅ Exit 0
+
+---
+
 ## 7. Próxima Fase
 
-Fase 15 sugerida: Upload de avatar, push notifications reais (Expo Notifications), painel admin funcional (Next.js) ou integração Fitbank.
+Fase 16 sugerida: Auth admin real (AdminUser + JWT separado), upload de avatar no mobile, push notifications reais (Expo Notifications) ou integração Fitbank.
 
 Não implementar sem instrução explícita: Fitbank real, blockchain real, KYC, push notifications reais.
 
