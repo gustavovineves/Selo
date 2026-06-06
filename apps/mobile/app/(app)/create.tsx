@@ -4,58 +4,60 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
-  Alert,
   ScrollView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { router } from 'expo-router';
 import { Colors, Spacing, Radii, FontSize, FontWeight, Shadow } from '../../src/theme';
 
 interface CreateOption {
   icon: keyof typeof Ionicons.glyphMap;
   title: string;
   subtitle: string;
+  description: string;
   color: string;
   bgColor: string;
+  type: 'receive' | 'pay' | 'custom' | 'guaranteed';
 }
 
 const OPTIONS: CreateOption[] = [
   {
     icon: 'arrow-down-circle',
     title: 'Valor a receber',
-    subtitle: 'Outra pessoa vai te pagar por algo',
+    subtitle: 'Registre um valor que alguém vai pagar para você.',
+    description: 'Outra pessoa vai te pagar por algo',
     color: Colors.accent,
     bgColor: Colors.accentLight,
+    type: 'receive',
   },
   {
     icon: 'arrow-up-circle',
     title: 'Valor a pagar',
-    subtitle: 'Você vai pagar outra pessoa por algo',
+    subtitle: 'Registre um valor que você vai pagar para alguém.',
+    description: 'Você vai pagar outra pessoa por algo',
     color: Colors.warning,
     bgColor: Colors.warningLight,
+    type: 'pay',
   },
   {
     icon: 'document-text',
     title: 'Acordo personalizado',
-    subtitle: 'Crie um combinado com seus próprios termos',
+    subtitle: 'Crie um combinado com prazo, participantes e condições.',
+    description: 'Crie um combinado com seus próprios termos',
     color: Colors.info,
     bgColor: Colors.infoLight,
+    type: 'custom',
   },
   {
     icon: 'shield-checkmark',
     title: 'Acordo com garantia',
-    subtitle: 'Valor protegido até o combinado ser cumprido',
+    subtitle: 'Proteja um valor até o combinado ser cumprido.',
+    description: 'Valor protegido até o combinado ser cumprido',
     color: Colors.primary,
     bgColor: Colors.primaryGlow,
+    type: 'guaranteed',
   },
 ];
-
-function showComingSoon() {
-  Alert.alert(
-    'Em breve',
-    'O fluxo de criação de combinados será implementado na próxima fase. Fique ligado!',
-    [{ text: 'Entendi', style: 'default' }],
-  );
-}
 
 export default function CreateScreen() {
   return (
@@ -73,7 +75,7 @@ export default function CreateScreen() {
         <TouchableOpacity
           key={i}
           style={styles.card}
-          onPress={showComingSoon}
+          onPress={() => router.push(`/create-agreement?type=${opt.type}` as never)}
           activeOpacity={0.75}
         >
           <View style={[styles.iconWrap, { backgroundColor: opt.bgColor }]}>
@@ -83,14 +85,15 @@ export default function CreateScreen() {
             <Text style={styles.cardTitle}>{opt.title}</Text>
             <Text style={styles.cardSubtitle}>{opt.subtitle}</Text>
           </View>
+
           <Ionicons name="chevron-forward" size={18} color={Colors.textMuted} />
         </TouchableOpacity>
       ))}
 
-      <View style={styles.comingBanner}>
-        <Ionicons name="time-outline" size={20} color={Colors.primary} />
-        <Text style={styles.comingText}>
-          Criação completa de combinados disponível na próxima fase.
+      <View style={styles.infoBanner}>
+        <Ionicons name="shield-checkmark-outline" size={20} color={Colors.accent} />
+        <Text style={styles.infoText}>
+          Seus combinados ficam registrados com histórico e rastreabilidade. Para acordos com valor protegido, a outra parte precisa aceitar antes do depósito.
         </Text>
       </View>
     </ScrollView>
@@ -141,8 +144,8 @@ const styles = StyleSheet.create({
     marginTop: 2,
     lineHeight: 18,
   },
-  comingBanner: {
-    backgroundColor: Colors.primaryGlow,
+  infoBanner: {
+    backgroundColor: Colors.accentLight,
     borderRadius: Radii.md,
     padding: Spacing.md,
     flexDirection: 'row',
@@ -150,10 +153,10 @@ const styles = StyleSheet.create({
     gap: Spacing.sm,
     marginTop: Spacing.sm,
   },
-  comingText: {
+  infoText: {
     flex: 1,
     fontSize: FontSize.sm,
-    color: Colors.primary,
+    color: Colors.accent,
     lineHeight: 20,
     fontWeight: FontWeight.medium,
   },

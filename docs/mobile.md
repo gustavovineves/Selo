@@ -213,17 +213,57 @@ O token JWT é armazenado via `expo-secure-store`. Para testes:
 
 ---
 
-## Limitações desta fase (Fase 9)
+## Fase 10 — Fluxo de Criação + Detalhe (Implementado)
+
+### Novas telas
+
+| Tela | Arquivo | Descrição |
+|---|---|---|
+| Wizard de criação | `app/create-agreement.tsx` | 5 etapas: quem, título, valor, prazo, resumo |
+| Detalhe do acordo | `app/agreement/[id].tsx` | Exibe dados completos + ações contextuais |
+
+### Novos componentes
+
+| Componente | Arquivo | Descrição |
+|---|---|---|
+| `StepHeader` | `src/components/StepHeader.tsx` | Cabeçalho com progresso e navegação entre etapas |
+| `ReceiverPreviewCard` | `src/components/ReceiverPreviewCard.tsx` | Card de confirmação visual do recebedor resolvido |
+
+### Wizard de criação — etapas
+
+1. **Quem** — input de chave + botão Confirmar → resolve via `GET /receiving-keys/resolve/:key`
+2. **Título + Descrição** — título obrigatório (3–100 chars), descrição opcional
+3. **Valor** — obrigatório para garantia, opcional com "Pular" para os demais
+4. **Prazo** — chips: Sem prazo / 7 dias / 30 dias / Personalizado (DD/MM/AAAA)
+5. **Resumo** — frase em linguagem humana + detalhes + "Criar combinado"
+6. **Sucesso** — resumo do acordo criado, botões "Ver acordo" e "Voltar para início"
+
+### Endpoints consumidos (Fase 10)
+
+| Método | Rota | Tela |
+|---|---|---|
+| GET | `/api/v1/receiving-keys/resolve/:key` | Wizard — etapa "Quem" |
+| POST | `/api/v1/agreements/simple` | Wizard — tipos receive, pay, custom |
+| POST | `/api/v1/agreements/guaranteed` | Wizard — tipo guaranteed |
+| GET | `/api/v1/agreements/:id` | Tela de detalhe |
+| POST | `/api/v1/agreements/:id/accept` | Ação: aceitar (contraparte) |
+| POST | `/api/v1/agreements/:id/decline` | Ação: recusar (contraparte) |
+| POST | `/api/v1/agreements/:id/cancel` | Ação: cancelar |
+| POST | `/api/v1/agreements/:id/complete` | Ação: concluir (simples) |
+| POST | `/api/v1/agreements/:id/confirm-completion` | Ação: confirmar conclusão (garantia) |
+
+### Limitações desta fase (Fase 10)
 
 | Limitação | Quando resolve |
 |---|---|
-| Fluxo de criação de combinado não implementado | Fase 10 |
-| Detalhe do acordo não implementado | Fase 10 |
-| Notificações push não implementadas | Fase 11 |
-| Refresh automático do token (401 → refresh → retry) | Fase 10 |
-| Animações de transição entre telas | Fase 10 |
-| Configurações de perfil (edição de nome, avatar) | Fase 10 |
-| Gerenciamento de chaves e destinos pelo app | Fase 10 |
+| Depósito Pix no app (payment-intents) | Fase 11 |
+| Abertura de disputa pelo app | Fase 11 |
+| Reembolso pelo app | Fase 11 |
+| Notificações push | Fase 11 |
+| Refresh automático do token (401 → refresh → retry) | Fase 11 |
+| Animações de transição entre telas | Fase 11 |
+| Configurações de perfil (edição de nome, avatar) | Fase 11 |
+| Gerenciamento de chaves e destinos pelo app | Fase 11 |
 
 ---
 
@@ -261,5 +301,20 @@ O token JWT é armazenado via `expo-secure-store`. Para testes:
 | `apps/mobile/app/(app)/_layout.tsx` | Reescrito (4 tabs + botão criar) |
 | `apps/mobile/app/(app)/home.tsx` | Reescrito (Home Wallet completa) |
 | `apps/mobile/app/(app)/agreements.tsx` | Reescrito (lista + filtros) |
-| `apps/mobile/app/(app)/create.tsx` | Criado (placeholder) |
+| `apps/mobile/app/(app)/create.tsx` | Criado (placeholder → Fase 9) / Atualizado (navegação real → Fase 10) |
 | `apps/mobile/app/(app)/profile.tsx` | Reescrito (perfil completo) |
+
+### Arquivos implementados/alterados — Fase 10
+
+| Arquivo | Ação |
+|---|---|
+| `apps/mobile/src/types/api.ts` | Adicionado `ResolveKeyResponse`, `AgreementDetail`, `CreateSimpleAgreementPayload`, `CreateGuaranteedAgreementPayload` |
+| `apps/mobile/src/services/receiving-keys.service.ts` | Adicionado `resolve()` |
+| `apps/mobile/src/services/agreements.service.ts` | Adicionado `createSimple`, `createGuaranteed`; `getById` retorna `AgreementDetail` |
+| `apps/mobile/src/components/StepHeader.tsx` | Criado |
+| `apps/mobile/src/components/ReceiverPreviewCard.tsx` | Criado |
+| `apps/mobile/src/components/index.ts` | Atualizado (novos exports) |
+| `apps/mobile/app/create-agreement.tsx` | Criado (wizard de criação, 5 etapas) |
+| `apps/mobile/app/agreement/[id].tsx` | Criado (detalhe + ações contextuais) |
+| `apps/mobile/app/(app)/create.tsx` | Atualizado (navega para wizard, remove Alert placeholder) |
+| `apps/mobile/app/_layout.tsx` | Atualizado (registra `create-agreement` e `agreement/[id]` no Stack) |

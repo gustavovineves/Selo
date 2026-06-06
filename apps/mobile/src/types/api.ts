@@ -183,3 +183,69 @@ export interface AuthTokenResponse {
   refreshToken: string;
   expiresIn: number;
 }
+
+export interface ResolveKeyResponse {
+  userId: string;
+  displayName: string | null;
+  avatarUrl: string | null;
+  key: string;
+  canReceiveAgreements: boolean;
+}
+
+export interface CreateSimpleAgreementPayload {
+  title: string;
+  counterpartyKey: string;
+  description?: string;
+  amount?: number;
+  currency?: string;
+  dueDate?: string;
+}
+
+export interface CreateGuaranteedAgreementPayload {
+  title: string;
+  counterpartyKey: string;
+  amount: number;
+  currency?: string;
+  description?: string;
+  dueDate?: string;
+}
+
+export interface AgreementDetail {
+  id: string;
+  title: string;
+  type: AgreementType;
+  operationalStatus: AgreementOperationalStatus;
+  financialStatus: AgreementFinancialStatus;
+  amount: number | null;
+  currency: string;
+  dueDate: string | null;
+  acceptanceExpiresAt: string | null;
+  confirmationDeadlineAt: string | null;
+  confirmationRule: string;
+  createdById: string;
+  payerId: string | null;
+  receiverId: string | null;
+  description: string | null;
+  generatedSummary: string | null;
+  receiverKeySnapshot: string | null;
+  receiverDestinationSnapshot: unknown;
+  createdAt: string;
+  updatedAt: string;
+  completedAt: string | null;
+  canceledAt: string | null;
+  disputedAt: string | null;
+  participants: AgreementParticipant[];
+  financialGuarantee: Array<{
+    id: string;
+    amount: number;
+    currency: string;
+    status: string;
+    lockedAt: string | null;
+  }>;
+  dispute: Array<{
+    id: string;
+    status: string;
+    reason: string | null;
+    openedById: string;
+  }>;
+}

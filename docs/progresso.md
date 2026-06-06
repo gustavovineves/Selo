@@ -1,6 +1,6 @@
 # Progresso do Projeto Selo
 
-Última atualização: 2026-06-06 (Fase 9 — Mobile Shell + Home Wallet implementado)
+Última atualização: 2026-06-06 (Fase 10 — Fluxo de Criação + Detalhe de Acordo no Mobile)
 
 ---
 
@@ -38,6 +38,7 @@
 | Home/Wallet/Listagens | ✅ Implementado (Fase 7) |
 | Destino de Recebimento | ✅ Implementado (Fase 8) |
 | App Mobile (shell + home wallet) | ✅ Implementado (Fase 9) |
+| App Mobile (criação de acordos + detalhe) | ✅ Implementado (Fase 10) |
 | Score de Confiança | ✅ recordEvent implementado (Fase 5 e 6) |
 | Git local | ✅ Limpo após commit da Fase 4 |
 
@@ -474,40 +475,83 @@ Usa `events: { none: { actorId: userId, type: CONFIRMED } }` para detectar exata
 
 ---
 
+## 5f. Fase 10 — Fluxo de Criação de Acordos + Detalhe (Implementada)
+
+### Telas criadas
+
+| Tela | Arquivo | Endpoints consumidos |
+|---|---|---|
+| Wizard de criação | `app/create-agreement.tsx` | `GET /receiving-keys/resolve/:key`, `POST /agreements/simple`, `POST /agreements/guaranteed` |
+| Detalhe do acordo | `app/agreement/[id].tsx` | `GET /agreements/:id`, ações POST |
+
+### O que foi implementado
+
+- **Wizard de criação guiado** em 5 etapas: quem → título → valor → prazo → resumo
+- **Resolução de chave de recebimento** em tempo real via `GET /receiving-keys/resolve/:key` com confirmação visual (`ReceiverPreviewCard`)
+- **Acordo simples**: criado para tipos `receive`, `pay`, `custom` via `POST /agreements/simple`
+- **Acordo com garantia**: tipo `guaranteed` via `POST /agreements/guaranteed` com verificação de destino de recebimento
+- **Mensagens de erro amigáveis**: destinatário sem destino, criando consigo mesmo, chave inválida, backend indisponível
+- **Resumo em linguagem humana**: frase gerada no cliente que explica o acordo em português claro
+- **Tela de sucesso** com botões "Ver acordo" e "Voltar para início"
+- **Detalhe do acordo**: exibe participantes, status, valor, prazo, descrição, estado da garantia
+- **Ações contextuais no detalhe**: aceitar, recusar, cancelar, concluir (simples), confirmar conclusão (garantia)
+- **JWT decode client-side** para identificar o papel do usuário sem chamada extra à API
+- **Seleção de prazo** com chips (Sem prazo / 7 dias / 30 dias / Personalizado)
+- **Novos componentes**: `StepHeader` (barra de progresso), `ReceiverPreviewCard` (confirmação do recebedor)
+
+### Decisões
+
+- **Wizard no Stack raiz** (`app/create-agreement.tsx`): aparece sobre o tab bar com `headerShown: false`, mantendo o botão de voltar do StepHeader no lugar do header nativo
+- **Detalhe no Stack raiz** (`app/agreement/[id].tsx`): header nativo roxo "Combinado", tab bar oculto, comportamento padrão de banco digital
+- **JWT decode para userId**: `atob()` nativo do RN 0.74 — sem biblioteca e sem chamada extra a `/auth/me`
+- **Ações recarregam o detalhe** (`loadData()`): após qualquer ação, a tela busca o acordo atualizado, garantindo dados frescos
+- **`parseDateInput`**: implementado inline sem dependência de date picker — formato DD/MM/AAAA com validação básica
+- **Pix e Fitbank continuam simulados**: nenhuma movimentação financeira real nesta fase
+
+### Testes — validação de build
+
+- ✅ `pnpm --filter @selo/mobile typecheck` — limpo (2 erros corrigidos: tipo de retorno de ações, comparação redundante)
+- ✅ `pnpm --filter @selo/api build` — limpo, sem regressão no backend
+- Schema não alterado / migration não rodada / commit não feito
+
+---
+
 ## 6. O Que NÃO Foi Implementado Ainda
 
 Os módulos abaixo existem como stubs (`NotImplementedException`) ou aguardam as fases futuras:
 
 | Funcionalidade | Fase | Módulo |
 |---|---|---|
-| Integração real Fitbank/BaaS | Fase 10 | `pix` + `payments` |
-| Webhook real do PSP | Fase 10 | `pix` |
-| Blockchain (submissão real) | Fase 10 | `blockchain-records` |
-| Painel Admin funcional (Next.js) | Fase 10 | `apps/admin` |
-| Notificações push | Fase 10 | `notifications` |
-| Auth admin real (AdminUser + JWT) | Fase 10 | `admin` |
-| Criação de combinado no mobile | Fase 10 | `apps/mobile` |
-| Detalhe de combinado no mobile | Fase 10 | `apps/mobile` |
-| Refresh automático do JWT (401 → refresh) | Fase 10 | `apps/mobile` |
+| Integração real Fitbank/BaaS | Fase 11 | `pix` + `payments` |
+| Webhook real do PSP | Fase 11 | `pix` |
+| Depósito Pix pelo app mobile (payment-intents) | Fase 11 | `apps/mobile` |
+| Blockchain (submissão real) | Fase 11 | `blockchain-records` |
+| Painel Admin funcional (Next.js) | Fase 11 | `apps/admin` |
+| Notificações push | Fase 11 | `notifications` |
+| Auth admin real (AdminUser + JWT) | Fase 11 | `admin` |
+| Abertura de disputa pelo app mobile | Fase 11 | `apps/mobile` |
+| Reembolso pelo app mobile | Fase 11 | `apps/mobile` |
+| Refresh automático do JWT (401 → refresh) | Fase 11 | `apps/mobile` |
+| Edição de perfil, avatar, chave, destino pelo app | Fase 11 | `apps/mobile` |
 
 ---
 
 ## 7. Próxima Fase
 
-### Fase 10 — Fluxo de Criação de Combinados no Mobile
+### Fase 11 — Pix no Mobile + Disputas + Notificações
 
-Objetivo: implementar o fluxo completo de criação de acordos no app, incluindo detalhe de acordos, ações (aceitar, recusar, confirmar), e manutenção de perfil.
+Objetivo: integrar depósito Pix dentro do app mobile, fluxos de disputa/reembolso e notificações push.
 
 O que implementar:
-- Tela de criação de acordo simples no mobile
-- Tela de criação de acordo com garantia no mobile
-- Tela de detalhe de acordo com ações contextuais
-- Refresh automático do JWT (interceptor de 401)
+- Depósito Pix via `POST /agreements/:id/payment-intents` com exibição de QR Code
+- Abertura de disputa pelo app: `POST /agreements/:id/dispute` + envio de mensagens
+- Reembolso pelo app: `POST /agreements/:id/refund`
+- Refresh automático do JWT (interceptor de 401 → refresh → retry)
+- Notificações push locais (Expo Notifications)
 - Edição de perfil: nome, avatar
 - Gerenciamento de chave e destino de recebimento pelo app
-- Notificações push locais (feedback de ação)
 
-Não implementar ainda: Fitbank real, blockchain real, painel admin, KYC.
+Não implementar ainda: Fitbank real, blockchain real, painel admin funcional, KYC.
 
 ---
 

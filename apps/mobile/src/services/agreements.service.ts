@@ -2,6 +2,9 @@ import { api } from './api';
 import type {
   AgreementListItem,
   AgreementsListResponse,
+  AgreementDetail,
+  CreateSimpleAgreementPayload,
+  CreateGuaranteedAgreementPayload,
 } from '../types/api';
 
 export interface ListAgreementsParams {
@@ -31,7 +34,13 @@ export const agreementsService = {
     return api.get<AgreementsListResponse>(`/agreements${query ? `?${query}` : ''}`);
   },
 
-  getById: (id: string) => api.get<AgreementListItem>(`/agreements/${id}`),
+  getById: (id: string) => api.get<AgreementDetail>(`/agreements/${id}`),
+
+  createSimple: (payload: CreateSimpleAgreementPayload) =>
+    api.post<AgreementDetail>('/agreements/simple', payload),
+
+  createGuaranteed: (payload: CreateGuaranteedAgreementPayload) =>
+    api.post<AgreementDetail>('/agreements/guaranteed', payload),
 
   accept: (id: string) => api.post<AgreementListItem>(`/agreements/${id}/accept`, {}),
 

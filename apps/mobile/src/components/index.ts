@@ -5,3 +5,5 @@ export { LoadingState, SkeletonCard } from './LoadingState';
 export { PrimaryButton } from './PrimaryButton';
 export { FinancialCard } from './FinancialCard';
 export { SectionHeader } from './SectionHeader';
+export { StepHeader } from './StepHeader';
+export { ReceiverPreviewCard } from './ReceiverPreviewCard';
