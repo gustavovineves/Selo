@@ -1,6 +1,6 @@
 # Progresso do Projeto Selo
 
-Última atualização: 2026-06-06 (Fase 10 — Fluxo de Criação + Detalhe de Acordo no Mobile)
+Última atualização: 2026-06-06 (Fase 11 — Garantia, Pix Simulado e Contestação Formal no Mobile)
 
 ---
 
@@ -39,6 +39,7 @@
 | Destino de Recebimento | ✅ Implementado (Fase 8) |
 | App Mobile (shell + home wallet) | ✅ Implementado (Fase 9) |
 | App Mobile (criação de acordos + detalhe) | ✅ Implementado (Fase 10) |
+| App Mobile (Pix simulado + contestação formal) | ✅ Implementado (Fase 11) |
 | Score de Confiança | ✅ recordEvent implementado (Fase 5 e 6) |
 | Git local | ✅ Limpo após commit da Fase 4 |
 
@@ -516,40 +517,95 @@ Usa `events: { none: { actorId: userId, type: CONFIRMED } }` para detectar exata
 
 ---
 
+## 5g. Fase 11 — Garantia, Pix Simulado e Contestação Formal no Mobile (Implementada)
+
+### O que foi implementado
+
+- **Fluxo Pix simulado no app**: card "Pagar com Pix" quando o criador precisa depositar; geração de PaymentIntent + exibição do código Pix copiável; botão de simulação de confirmação
+- **Card "Valor protegido"**: exibido quando `FUNDS_HELD`, mostra valor, destino mascarado e mensagem humana
+- **Dupla confirmação contextual**: mensagem diferente na 1ª e 2ª confirmação (Alert informativo)
+- **Contestação formal no app**: botão "Contestar" → formulário inline com motivo + descrição objetiva + aviso sobre travamento
+- **Histórico formal da contestação**: seção "Contestação" com status, quem abriu, motivo, descrição e histórico de evidências formais
+- **Adição de evidências**: botão "Adicionar evidência" → campo de texto → `POST /disputes/:id/messages` (tratado como registro formal, não chat)
+- **Card de resolução administrativa**: exibido quando a contestação é resolvida, com resultado (liberado/reembolsado), justificativa e data
+- **Mensagens de erro amigáveis**: cobertura de todos os cenários (sessão expirada, sem permissão, contestação já aberta, pagamento em andamento, etc.)
+- **Estado "Em contestação"**: botões de ação substituídos por card informativo enquanto contestação está aberta
+
+### Arquivos criados
+
+| Arquivo | Descrição |
+|---|---|
+| `apps/mobile/src/services/payments.service.ts` | `simulateConfirmation(paymentIntentId)` |
+| `apps/mobile/src/services/disputes.service.ts` | `getById(disputeId)`, `addEvidence(disputeId, payload)` |
+
+### Arquivos alterados
+
+| Arquivo | O que mudou |
+|---|---|
+| `apps/mobile/src/types/api.ts` | +6 tipos: `PaymentIntentResponse`, `SimulateConfirmationResponse`, `OpenDisputePayload`, `DisputeMessage`, `DisputeDetail`, `AddEvidencePayload` |
+| `apps/mobile/src/services/agreements.service.ts` | +3 métodos: `createPaymentIntent`, `openDispute`, `getDispute` |
+| `apps/mobile/app/agreement/[id].tsx` | Reescrita completa (772 → 1296 linhas) |
+
+### Endpoints consumidos
+
+| Método | Rota | Tela |
+|---|---|---|
+| POST | `/api/v1/agreements/:id/payment-intents` | Card "Pagar com Pix" |
+| POST | `/api/v1/payments/:id/simulate-confirmation` | Botão simulação |
+| GET | `/api/v1/disputes/:id` | Carregado automaticamente |
+| POST | `/api/v1/agreements/:id/dispute` | Formulário de contestação |
+| POST | `/api/v1/disputes/:id/messages` | Envio de evidência formal |
+
+### Decisões desta fase
+
+- **Contestação não é chat**: o backend usa `/messages` por compatibilidade, mas o app trata como evidência/registro formal unidirecional. Nunca exibe como conversa.
+- **Pix continua simulado**: `POST /payment-intents` cria QR Code simulado; `simulate-confirmation` confirma sem Fitbank real.
+- **Formulário inline**: a contestação abre como seção inline na scroll view (não Modal). Simplicidade e sem dependência de novo componente.
+- **Dispute detail load**: carregado em paralelo após carregar o agreement; erro não bloqueia exibição do acordo.
+- **Share nativo para código Pix**: usa `Share.share()` do React Native — sem nova dependência.
+- **Mensagens de erro contextuais**: função `mapApiError()` mapeia mensagens brutas para texto amigável em português por contexto (pix, dispute, confirm, action).
+- **Sem migration**: nenhuma alteração no schema Prisma.
+- **Sem commit**: conforme instrução.
+
+### Validação
+
+- `pnpm --filter @selo/mobile typecheck` → ✅ limpo
+- `pnpm --filter @selo/api build` → ✅ limpo, sem regressão
+
+---
+
 ## 6. O Que NÃO Foi Implementado Ainda
 
 Os módulos abaixo existem como stubs (`NotImplementedException`) ou aguardam as fases futuras:
 
 | Funcionalidade | Fase | Módulo |
 |---|---|---|
-| Integração real Fitbank/BaaS | Fase 11 | `pix` + `payments` |
-| Webhook real do PSP | Fase 11 | `pix` |
-| Depósito Pix pelo app mobile (payment-intents) | Fase 11 | `apps/mobile` |
-| Blockchain (submissão real) | Fase 11 | `blockchain-records` |
-| Painel Admin funcional (Next.js) | Fase 11 | `apps/admin` |
-| Notificações push | Fase 11 | `notifications` |
-| Auth admin real (AdminUser + JWT) | Fase 11 | `admin` |
-| Abertura de disputa pelo app mobile | Fase 11 | `apps/mobile` |
-| Reembolso pelo app mobile | Fase 11 | `apps/mobile` |
-| Refresh automático do JWT (401 → refresh) | Fase 11 | `apps/mobile` |
-| Edição de perfil, avatar, chave, destino pelo app | Fase 11 | `apps/mobile` |
+| Integração real Fitbank/BaaS | Fase 12 | `pix` + `payments` |
+| Webhook real do PSP | Fase 12 | `pix` |
+| Blockchain (submissão real) | Fase 12 | `blockchain-records` |
+| Painel Admin funcional (Next.js) | Fase 12 | `apps/admin` |
+| Notificações push | Fase 12 | `notifications` |
+| Auth admin real (AdminUser + JWT) | Fase 12 | `admin` |
+| Reembolso pelo app mobile (botão refund) | Fase 12 | `apps/mobile` |
+| Refresh automático do JWT (401 → refresh) | Fase 12 | `apps/mobile` |
+| Edição de perfil, avatar, chave, destino pelo app | Fase 12 | `apps/mobile` |
+| Upload de arquivo como evidência de contestação | Fase 12 | `apps/mobile` |
 
 ---
 
 ## 7. Próxima Fase
 
-### Fase 11 — Pix no Mobile + Disputas + Notificações
+### Fase 12 — Reembolso, JWT Refresh e Edição de Perfil no Mobile
 
-Objetivo: integrar depósito Pix dentro do app mobile, fluxos de disputa/reembolso e notificações push.
+Objetivo: completar o fluxo mobile com reembolso (botão refund), refresh automático do JWT e edição de perfil.
 
 O que implementar:
-- Depósito Pix via `POST /agreements/:id/payment-intents` com exibição de QR Code
-- Abertura de disputa pelo app: `POST /agreements/:id/dispute` + envio de mensagens
-- Reembolso pelo app: `POST /agreements/:id/refund`
-- Refresh automático do JWT (interceptor de 401 → refresh → retry)
+- Botão "Reembolsar" no app para acordos `ACTIVE + FUNDS_HELD`
+- Interceptor de 401 → `POST /auth/refresh` → retry automático
+- Edição de perfil: nome display, avatar
+- Gerenciamento de chave de recebimento pelo app (criar, excluir)
+- Gerenciamento de destino de recebimento pelo app (criar, excluir)
 - Notificações push locais (Expo Notifications)
-- Edição de perfil: nome, avatar
-- Gerenciamento de chave e destino de recebimento pelo app
 
 Não implementar ainda: Fitbank real, blockchain real, painel admin funcional, KYC.
 

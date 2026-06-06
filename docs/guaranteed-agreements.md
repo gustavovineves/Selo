@@ -719,3 +719,36 @@ Ver [docs/receiving-destinations.md](receiving-destinations.md) para documentaç
 - `apps/api/src/modules/disputes/dto/add-dispute-message.dto.ts`
 - `apps/api/src/modules/trust-score/trust-score.service.ts` — `recordEvent`
 - `apps/api/src/modules/blockchain-records/blockchain-records.service.ts` — `createPending`
+
+---
+
+## Fluxo Completo no App Mobile (Fase 11)
+
+O app implementa toda a jornada do acordo com garantia, do pagamento à contestação.
+
+### Sequência de telas/estados no detalhe do acordo
+
+| Estado do acordo | O que o app exibe |
+|---|---|
+| `AWAITING_ACCEPTANCE` + criador | Botão "Cancelar convite" |
+| `AWAITING_ACCEPTANCE` + contraparte | Botões "Aceitar" e "Recusar" |
+| `ACTIVE` + `AWAITING_PAYMENT` + criador | Card "Pagar com Pix" + botão "Gerar Pix" |
+| `ACTIVE` + `AWAITING_PAYMENT` + contraparte | "Aguardando pagamento do criador." |
+| `ACTIVE` + `FUNDS_HELD` | Card "Valor protegido" + botões "Confirmar conclusão" e "Contestar" |
+| `AWAITING_CONFIRMATION` + `FUNDS_HELD` | Card "Valor protegido" + botão "Confirmar conclusão" (2ª confirmação) + "Contestar" |
+| `DISPUTED` | Card "Em contestação" + seção formal da contestação + "Adicionar evidência" |
+| `COMPLETED` + `PAID_OUT` | "Combinado concluído. Pagamento liberado ao recebedor." |
+| `CANCELLED` + `REFUNDED` | "Combinado encerrado. Valor reembolsado ao pagador." |
+| Contestação resolvida | Card de resolução com justificativa e status final |
+
+### Verificação de contexto
+
+- `isCreator` = `agreement.createdById === currentUserId` (JWT decode client-side)
+- `isCounterpart` = participante com `role = COUNTERPART`
+- No MVP: criador = pagador, contraparte = recebedor
+
+### Limitações do app no MVP
+
+- Reembolso (botão refund) não implementado no app → Fase 12
+- Sem upload de arquivo como evidência → Fase 12
+- Sem notificações push de mudança de estado → Fase 12

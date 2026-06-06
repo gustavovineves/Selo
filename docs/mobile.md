@@ -256,14 +256,116 @@ O token JWT é armazenado via `expo-secure-store`. Para testes:
 
 | Limitação | Quando resolve |
 |---|---|
-| Depósito Pix no app (payment-intents) | Fase 11 |
-| Abertura de disputa pelo app | Fase 11 |
-| Reembolso pelo app | Fase 11 |
-| Notificações push | Fase 11 |
-| Refresh automático do token (401 → refresh → retry) | Fase 11 |
-| Animações de transição entre telas | Fase 11 |
-| Configurações de perfil (edição de nome, avatar) | Fase 11 |
-| Gerenciamento de chaves e destinos pelo app | Fase 11 |
+| Depósito Pix no app (payment-intents) | Fase 11 ✅ |
+| Abertura de disputa pelo app | Fase 11 ✅ |
+| Notificações push | Fase 12 |
+| Refresh automático do token (401 → refresh → retry) | Fase 12 |
+| Animações de transição entre telas | Fase 12 |
+| Configurações de perfil (edição de nome, avatar) | Fase 12 |
+| Gerenciamento de chaves e destinos pelo app | Fase 12 |
+| Reembolso pelo app (botão refund) | Fase 12 |
+
+---
+
+## Fase 11 — Garantia, Pix Simulado e Contestação Formal (Implementado)
+
+### Telas alteradas
+
+| Tela | Arquivo | O que mudou |
+|---|---|---|
+| Detalhe do acordo | `app/agreement/[id].tsx` | Reescrita completa com todos os fluxos da Fase 11 |
+
+### Novos serviços
+
+| Serviço | Arquivo | Métodos |
+|---|---|---|
+| `paymentsService` | `src/services/payments.service.ts` | `simulateConfirmation(paymentIntentId)` |
+| `disputesService` | `src/services/disputes.service.ts` | `getById(disputeId)`, `addEvidence(disputeId, payload)` |
+
+### Métodos adicionados a serviços existentes
+
+| Serviço | Método | Endpoint |
+|---|---|---|
+| `agreementsService` | `createPaymentIntent(id)` | `POST /agreements/:id/payment-intents` |
+| `agreementsService` | `openDispute(id, payload)` | `POST /agreements/:id/dispute` |
+| `agreementsService` | `getDispute(id)` | `GET /agreements/:id/dispute` |
+
+### Novos tipos em `api.ts`
+
+- `PaymentIntentResponse` — resposta de `POST /payment-intents` com `pixCharge.qrCode`
+- `SimulateConfirmationResponse` — resposta de `simulate-confirmation` com estado da garantia
+- `OpenDisputePayload` — payload para abrir contestação (`reason`, `description`)
+- `DisputeMessage` — evidência/registro formal da contestação
+- `DisputeDetail` — detalhe completo da contestação com histórico formal
+- `AddEvidencePayload` — payload para enviar evidência
+
+### Fluxo Pix simulado no app
+
+1. Acordo `WITH_GUARANTEE` + aceito + `AWAITING_PAYMENT` + criador → **card "Pagar com Pix"**
+2. Botão **"Gerar Pix"** → `POST /payment-intents` → exibe código QR/Pix copiável
+3. Botão **"Compartilhar código Pix"** → compartilha código via share nativo
+4. Botão **"Simular pagamento confirmado"** → `POST /simulate-confirmation` → recarrega detalhe
+5. `financialStatus → FUNDS_HELD` → **card "Valor protegido"** exibido
+
+### Fluxo de dupla confirmação no app
+
+| Estado | Mensagem exibida |
+|---|---|
+| 1ª confirmação (`ops = ACTIVE`) | "Depois da sua confirmação, a outra parte ainda precisará confirmar para o valor ser liberado." |
+| 2ª confirmação (`ops = AWAITING_CONFIRMATION`) | "Ao confirmar, o valor será liberado ao recebedor." |
+
+### Fluxo de contestação formal no app
+
+1. Acordo `FUNDS_HELD` + não encerrado → botão **"Contestar"** aparece
+2. Formulário inline: **motivo** + **descrição objetiva**
+3. Aviso antes do envio: "Quando uma contestação é aberta, o valor fica travado até resolução administrativa."
+4. `POST /agreements/:id/dispute` → acordo entra em `DISPUTED`
+5. Botão de ações substituído por card "Em contestação — Valor travado até decisão administrativa."
+6. Seção **"Contestação"** exibe: status, quem abriu, data, motivo, descrição, histórico formal
+7. Botão **"Adicionar evidência"** disponível enquanto contestação está `OPEN`
+8. Evidências são registros formais para análise — **não é chat**
+9. Decisão administrativa exibida como **card de resolução** com justificativa e status final
+
+### O que NÃO é contestação no Selo
+
+- Não é chat entre as partes
+- Não há troca livre de mensagens
+- Não há botão "responder"
+- Não há feed conversacional
+- Os registros são formais, unidirecionais, para análise administrativa
+- O backend usa internamente o endpoint `/messages` por compatibilidade — no app, chamado de "evidência"
+
+### Endpoints consumidos (Fase 11)
+
+| Método | Rota | Onde |
+|---|---|---|
+| POST | `/api/v1/agreements/:id/payment-intents` | Card "Pagar com Pix" |
+| POST | `/api/v1/payments/:id/simulate-confirmation` | Botão "Simular pagamento confirmado" |
+| GET | `/api/v1/disputes/:id` | Carregado automaticamente se dispute existe |
+| POST | `/api/v1/agreements/:id/dispute` | Formulário de contestação |
+| POST | `/api/v1/disputes/:id/messages` | Envio de evidência (tratado como registro formal) |
+
+### Limitações desta fase (Fase 11)
+
+| Limitação | Quando resolve |
+|---|---|
+| Reembolso pelo app (botão refund) | Fase 12 |
+| Refresh automático do JWT (401 → refresh) | Fase 12 |
+| Notificações push | Fase 12 |
+| Edição de perfil, avatar, chave, destino pelo app | Fase 12 |
+| Animações entre telas | Fase 12 |
+| Upload de arquivo como evidência | Fase 12 |
+| Painel admin mobile | Fora do escopo |
+
+### Arquivos criados/alterados — Fase 11
+
+| Arquivo | Ação |
+|---|---|
+| `apps/mobile/src/types/api.ts` | Adicionado 6 novos tipos |
+| `apps/mobile/src/services/agreements.service.ts` | Adicionado `createPaymentIntent`, `openDispute`, `getDispute` |
+| `apps/mobile/src/services/payments.service.ts` | Criado (`simulateConfirmation`) |
+| `apps/mobile/src/services/disputes.service.ts` | Criado (`getById`, `addEvidence`) |
+| `apps/mobile/app/agreement/[id].tsx` | Reescrito — Fase 11 completa |
 
 ---
 

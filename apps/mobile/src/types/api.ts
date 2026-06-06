@@ -249,3 +249,79 @@ export interface AgreementDetail {
     openedById: string;
   }>;
 }
+
+export interface PaymentIntentResponse {
+  id: string;
+  status: string;
+  amount: string;
+  currency: string;
+  expiresAt: string | null;
+  pixCharge: {
+    id: string;
+    txid: string;
+    pixKey: string;
+    qrCode: string;
+    amount: string;
+    status: string;
+    expiresAt: string | null;
+  } | null;
+}
+
+export interface SimulateConfirmationResponse {
+  id: string;
+  status: string;
+  paidAt: string | null;
+  pixCharge: {
+    id: string;
+    status: string;
+    paidAt: string | null;
+  } | null;
+  agreement: {
+    id: string;
+    operationalStatus: AgreementOperationalStatus;
+    financialStatus: AgreementFinancialStatus;
+    financialGuarantee: {
+      id: string;
+      status: string;
+      amount: string;
+      currency: string;
+      lockedAt: string | null;
+    } | null;
+  };
+}
+
+export interface OpenDisputePayload {
+  reason: string;
+  description: string;
+}
+
+export interface DisputeMessage {
+  id: string;
+  senderId: string;
+  senderType: string;
+  type: string;
+  content: string;
+  createdAt: string;
+}
+
+export interface DisputeDetail {
+  id: string;
+  agreementId: string;
+  openedById: string;
+  reason: string | null;
+  description: string | null;
+  status: string;
+  resolution: string | null;
+  resolvedById: string | null;
+  resolvedByType: string | null;
+  resolvedAt: string | null;
+  closedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  messages: DisputeMessage[];
+}
+
+export interface AddEvidencePayload {
+  content: string;
+  type?: 'TEXT' | 'EVIDENCE';
+}

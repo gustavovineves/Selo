@@ -5,6 +5,9 @@ import type {
   AgreementDetail,
   CreateSimpleAgreementPayload,
   CreateGuaranteedAgreementPayload,
+  PaymentIntentResponse,
+  OpenDisputePayload,
+  DisputeDetail,
 } from '../types/api';
 
 export interface ListAgreementsParams {
@@ -52,4 +55,12 @@ export const agreementsService = {
 
   confirmCompletion: (id: string) =>
     api.post<AgreementListItem>(`/agreements/${id}/confirm-completion`, {}),
+
+  createPaymentIntent: (id: string) =>
+    api.post<PaymentIntentResponse>(`/agreements/${id}/payment-intents`, {}),
+
+  openDispute: (id: string, payload: OpenDisputePayload) =>
+    api.post<AgreementDetail>(`/agreements/${id}/dispute`, payload),
+
+  getDispute: (id: string) => api.get<DisputeDetail>(`/agreements/${id}/dispute`),
 };

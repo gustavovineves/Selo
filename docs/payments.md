@@ -122,3 +122,40 @@ Uma garantia pode ter múltiplos `PaymentIntent` (retry flow): se um QR Code exp
 | Confirmação | `POST /payments/:id/simulate-confirmation` | Webhook `POST /webhooks/pix/confirmation` |
 | Payout | `status=COMPLETED` imediato | Transação real Fitbank → recebedor |
 | Refund | `status=COMPLETED` imediato | Transação real Fitbank → pagador |
+
+---
+
+## Fluxo Pix no App Mobile (Fase 11)
+
+O app mobile implementa o fluxo de pagamento simulado diretamente na tela de detalhe do acordo.
+
+### Serviços mobile
+
+```typescript
+// agreements.service.ts
+createPaymentIntent: (id: string) => POST /agreements/:id/payment-intents
+
+// payments.service.ts
+simulateConfirmation: (paymentIntentId: string) => POST /payments/:id/simulate-confirmation
+```
+
+### UX no app
+
+1. Acordo `WITH_GUARANTEE` + aceito + `AWAITING_PAYMENT` + usuário é criador → **card "Pagar com Pix"** visível
+2. Botão **"Gerar Pix"** → chama `createPaymentIntent()` → exibe `pixCharge.qrCode` como texto copiável
+3. Botão **"Compartilhar código Pix"** → `Share.share()` nativo
+4. Seção **"Apenas para simulação"** com botão **"Simular pagamento confirmado"**
+5. Após confirmação → `financialStatus → FUNDS_HELD` → card "Valor protegido" exibido
+
+### Termos usados no app
+
+| Técnico | App (usuário) |
+|---|---|
+| `AWAITING_PAYMENT` | "Aguardando pagamento" |
+| `FUNDS_HELD` | "Valor protegido" |
+| `payment-intents` | "Pagar com Pix" / "Gerar Pix" |
+| `simulate-confirmation` | "Simular pagamento confirmado" (dev) |
+| `PAID_OUT` | "Pagamento liberado" |
+| `REFUNDED` | "Reembolsado" |
+
+> **Fitbank não foi integrado.** Pix continua simulado. Nenhum dinheiro real é movimentado.

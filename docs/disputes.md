@@ -308,3 +308,37 @@ Em produção, a decisão administrativa acionaria o parceiro financeiro (Fitban
 | 404 | Disputa não encontrada |
 | 409 | Já existe disputa para este acordo |
 | 409 | Release/confirm-completion bloqueado por disputa aberta |
+
+---
+
+## Contestação no App Mobile (Fase 11)
+
+### O que é e o que não é
+
+A contestação no Selo não é um chat. É um **registro formal para análise administrativa**.
+
+| O que é | O que não é |
+|---|---|
+| Registro formal de ocorrência | Chat entre as partes |
+| Evidências pontuais para análise | Conversa livre |
+| Decisão administrativa | Negociação entre participantes |
+| Histórico imutável | Troca de mensagens em tempo real |
+
+### Interface no app
+
+- **Botão "Contestar"**: aparece quando `FUNDS_HELD` e sem disputa aberta
+- **Formulário de contestação**: campos `motivo` e `descrição objetiva`
+- **Aviso obrigatório**: "Quando uma contestação é aberta, o valor fica travado até resolução administrativa."
+- **Seção "Contestação"**: exibe status, abertura, motivo, descrição, histórico formal
+- **"Adicionar evidência"**: campo de texto → enviado como `type: EVIDENCE` ao endpoint `/messages` (tratado como registro formal, não chat)
+- **Card de resolução**: exibido quando disputa resolvida pelo admin
+
+### Terminologia no app
+
+| No código/backend | No app para o usuário |
+|---|---|
+| `messages` | evidências, histórico formal |
+| `DisputeMessage` | evidência, registro, informação para análise |
+| `OPEN` | Aberta — aguardando análise |
+| `RESOLVED_FAVOR_COUNTERPART` | Contestação resolvida — valor liberado ao recebedor |
+| `RESOLVED_FAVOR_CREATOR` | Contestação resolvida — valor reembolsado ao pagador |
