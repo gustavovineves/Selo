@@ -57,6 +57,13 @@ export class AgreementsController {
     return this.service.findAllByUser(user.id, query);
   }
 
+  // IMPORTANT: 'summary' must be declared BEFORE ':id' so Express matches
+  // the static segment before the parameterized one.
+  @Get('summary')
+  getWalletSummary(@CurrentUser() user: AuthenticatedUser) {
+    return this.service.getWalletSummary(user.id);
+  }
+
   @Get(':id')
   findOne(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
     return this.service.findOne(user.id, id);

@@ -1,6 +1,6 @@
 # Progresso do Projeto Selo
 
-Última atualização: 2026-06-05 (Fase 6 — resolução administrativa de disputas implementada)
+Última atualização: 2026-06-05 (Fase 7 — home/wallet/listagens implementadas)
 
 ---
 
@@ -35,6 +35,7 @@
 | Pagamento Pix (simulado) | ✅ Implementado com simulate-confirmation (Fase 5) |
 | Disputas básicas | ✅ Implementado (Fase 5) |
 | Resolução admin de disputas | ✅ Implementado (Fase 6) |
+| Home/Wallet/Listagens | ✅ Implementado (Fase 7) |
 | Score de Confiança | ✅ recordEvent implementado (Fase 5 e 6) |
 | Git local | ✅ Limpo após commit da Fase 4 |
 
@@ -328,29 +329,89 @@ Testes negativos:
 
 ---
 
-## 5. O Que NÃO Foi Implementado Ainda
+## 5c. Fase 7 — Home/Wallet/Listagens (Implementada)
+
+### Endpoints disponíveis
+
+| Método | Rota | Auth | Descrição |
+|--------|------|------|-----------|
+| GET | `/api/v1/agreements/summary` | JWT | Resumo da wallet — home do app mobile |
+| GET | `/api/v1/agreements` | JWT | Listagem com filtros expandidos |
+
+### O que foi implementado
+
+**Novo endpoint `GET /agreements/summary`:**
+- Dados do usuário: id, displayName, avatarUrl, trustScore (score + level)
+- Chave de recebimento ativa: key, status
+- Contadores por categoria: activeAgreements, pendingMyAction, pendingOtherPartyAction, awaitingAcceptance, awaitingPayment, awaitingConfirmation, withGuarantee, inDispute, completed, cancelled, dueSoon
+- Somatórios financeiros por papel: amountsToReceive, amountsToPay, protectedAmounts (count + total + currency)
+- Seções com até 10 itens cada: pendingMyAction, amountsToReceive, amountsToPay, active, withGuarantee, inDispute, dueSoon, recent
+- Cada item das seções inclui campos computados: myRole, isCreator, isPayer, isReceiver
+
+**Filtros adicionados em `GET /agreements`:**
+- `financialStatus` — filtra por status financeiro (ex: `FUNDS_HELD`, `DISPUTED`)
+- `myRole` — filtra por papel: `creator`, `counterpart`, `payer`, `receiver`
+- `pendingMyAction=true` — acordos onde o usuário precisa agir (versão precisa com subquery `events.none`)
+- `hasGuarantee` — atalho para `type=WITH_GUARANTEE` (true) ou `type=SIMPLE` (false)
+- `inDispute` — acordos com disputa bloqueante (`OPEN`, `UNDER_REVIEW`, `AWAITING_EVIDENCE`)
+- `dueBefore` / `dueAfter` — filtro por prazo (ISO8601)
+
+**Campos adicionados na resposta de listagem:**
+- `payerId`, `receiverId` — identificação clara dos papéis financeiros
+- `description` — conteúdo completo do acordo
+- `receiverKeySnapshot` — snapshot da chave do recebedor no momento da criação
+- `confirmationDeadlineAt` — prazo para confirmação
+- `disputedAt` — quando a disputa foi aberta
+- `participants[].acceptedAt` — quando cada parte aceitou
+- `financialGuarantee[].lockedAt` — quando a garantia foi travada
+- `dispute[].reason`, `dispute[].openedById` — razão e quem abriu a disputa
+- Ordenação alterada de `createdAt` para `updatedAt desc` — acordos recentemente movimentados primeiro
+
+**Lógica de `pendingMyAction` precisa (lista):**
+Usa `events: { none: { actorId: userId, type: CONFIRMED } }` para detectar exatamente se o usuário já confirmou conclusão, evitando falsos positivos.
+
+### Decisões desta fase
+
+- **Endpoint de summary usa processamento in-memory**: uma única query busca todos os acordos; contadores e seções são calculados no Node.js. Eficiente para volume de acordos por usuário no MVP.
+- **Summary.pendingMyAction é aproximado**: inclui todos em AWAITING_CONFIRMATION porque não busca eventos. Para contagem precisa, usar `GET /agreements?pendingMyAction=true`.
+- **`GET /summary` declarado antes de `GET /:id`**: evita que Express capture `summary` como `:id`.
+- **Sem migration**: nenhum campo novo no schema. Apenas lógica de query e serialização de campos já existentes.
+- **Pix e Fitbank continuam simulados**: nenhuma movimentação real.
+
+### Testes manuais — 2026-06-05
+
+- ✅ Build limpo (`pnpm --filter @selo/api build` sem erros TypeScript)
+- ✅ `GET /agreements/summary` compila e retorna estrutura correta
+- ✅ Novos filtros compilam (`financialStatus`, `myRole`, `pendingMyAction`, `hasGuarantee`, `inDispute`, `dueBefore`, `dueAfter`)
+- ✅ Route order: `GET /summary` registrado antes de `GET /:id`
+
+---
+
+## 6. O Que NÃO Foi Implementado Ainda
 
 Os módulos abaixo existem como stubs (`NotImplementedException`) e aguardam as fases futuras:
 
 | Funcionalidade | Fase | Módulo |
 |---|---|---|
-| Destinos de recebimento (ReceivingDestination) | Fase 7 | `receiving-destinations` |
-| Integração real Fitbank/BaaS | Fase 7 | `pix` + `payments` |
-| Webhook real do PSP | Fase 7 | `pix` |
-| Blockchain (submissão real) | Fase 7 | `blockchain-records` |
-| Painel Admin funcional (Next.js) | Fase 7 | `apps/admin` |
-| Notificações push | Fase 7 | `notifications` |
-| Auth admin real (AdminUser + JWT) | Fase 7 | `admin` |
+| Destinos de recebimento (ReceivingDestination) | Fase 8 | `receiving-destinations` |
+| Integração real Fitbank/BaaS | Fase 8 | `pix` + `payments` |
+| Webhook real do PSP | Fase 8 | `pix` |
+| Blockchain (submissão real) | Fase 8 | `blockchain-records` |
+| Painel Admin funcional (Next.js) | Fase 8 | `apps/admin` |
+| Notificações push | Fase 8 | `notifications` |
+| Auth admin real (AdminUser + JWT) | Fase 8 | `admin` |
+| App mobile integrado | Fase 8 | `apps/mobile` |
 
 ---
 
-## 6. Próxima Fase
+## 7. Próxima Fase
 
-### Fase 7 — Integração Real e Painel Admin
+### Fase 8 — Integração Real e App Mobile
 
-Objetivo: substituir simulações por integrações reais e construir o painel administrativo completo.
+Objetivo: substituir simulações por integrações reais e construir as telas do app mobile.
 
 O que implementar:
+- App mobile (Expo): tela home usando `GET /agreements/summary`, listagens, detalhes
 - Integração Fitbank/BaaS real: cobrança Pix, payout, reembolso
 - Webhook real de confirmação do PSP (`POST /webhooks/pix/confirmation`)
 - `ReceivingDestination` — destinos de recebimento do usuário para payout
@@ -363,7 +424,7 @@ Não implementar ainda: Fitbank produção, mainnet blockchain, KYC completo.
 
 ---
 
-## 7. Comandos Úteis
+## 8. Comandos Úteis
 
 ```bash
 # Subir banco de dados (PostgreSQL porta 5434)
@@ -411,7 +472,7 @@ Invoke-RestMethod -Uri "http://localhost:3000/api/v1/receiving-keys/resolve/dev"
 
 ---
 
-## 8. Links de Documentação
+## 9. Links de Documentação
 
 | Arquivo | Conteúdo |
 |---------|----------|
@@ -419,10 +480,10 @@ Invoke-RestMethod -Uri "http://localhost:3000/api/v1/receiving-keys/resolve/dev"
 | [docs/architecture.md](architecture.md) | Arquitetura geral e fluxos |
 | [docs/auth.md](auth.md) | Autenticação: endpoints, exemplos, fluxo futuro OTP |
 | [docs/receiving-keys.md](receiving-keys.md) | Chave de Recebimento do App: conceito, endpoints, regras, exemplos |
-| [docs/agreements.md](agreements.md) | Acordos Simples: ciclo de vida, endpoints, regras, exemplos PowerShell |
+| [docs/agreements.md](agreements.md) | Acordos: ciclo de vida, filtros expandidos, summary da wallet |
 | [docs/guaranteed-agreements.md](guaranteed-agreements.md) | Acordos com Garantia: fluxo financeiro, endpoints, simulação, PowerShell |
 | [docs/payments.md](payments.md) | Pagamentos: PaymentIntent, PixCharge, simulate-confirmation, dev vs. produção |
-| [docs/disputes.md](disputes.md) | Disputas: abertura, mensagens, score, resolução futura |
+| [docs/disputes.md](disputes.md) | Disputas: abertura, mensagens, score, resolução admin |
 | [docs/database.md](database.md) | Todos os 22 models e 37 enums do schema Prisma |
 | [docs/modules.md](modules.md) | Endpoints de todos os módulos do backend |
 | [docs/getting-started.md](getting-started.md) | Setup inicial do ambiente |

@@ -26,6 +26,7 @@ import {
   TrustScoreEventType,
   AuditAction,
   ReceivingKeyType,
+  DisputeStatus,
   Prisma,
 } from '@prisma/client';
 import { createHash, randomUUID } from 'crypto';
@@ -35,7 +36,7 @@ import { TrustScoreService } from '../trust-score/trust-score.service';
 import { BlockchainRecordsService } from '../blockchain-records/blockchain-records.service';
 import { CreateSimpleAgreementDto } from './dto/create-simple-agreement.dto';
 import { CreateGuaranteedAgreementDto } from './dto/create-guaranteed-agreement.dto';
-import { ListAgreementsDto } from './dto/list-agreements.dto';
+import { ListAgreementsDto, MyAgreementRole } from './dto/list-agreements.dto';
 import { OpenDisputeDto } from './dto/open-dispute.dto';
 
 // ── Participant select used in find queries ──────────────────────
@@ -1325,21 +1326,186 @@ export class AgreementsService {
   }
 
   async findAllByUser(userId: string, query: ListAgreementsDto) {
-    const { status, type, page = 1, limit = 20 } = query;
+    const {
+      status,
+      type,
+      financialStatus,
+      myRole,
+      pendingMyAction,
+      hasGuarantee,
+      inDispute,
+      dueBefore,
+      dueAfter,
+      page = 1,
+      limit = 20,
+    } = query;
     const skip = (page - 1) * limit;
 
-    const where: Prisma.AgreementWhereInput = {
-      participants: { some: { userId } },
-      ...(status ? { operationalStatus: status } : {}),
-      ...(type ? { type } : {}),
+    // Base security filter: user must be a participant
+    let participantsFilter: Prisma.AgreementParticipantListRelationFilter = {
+      some: { userId },
     };
+
+    // When filtering by counterpart role, tighten the participant filter
+    if (myRole === MyAgreementRole.COUNTERPART) {
+      participantsFilter = {
+        some: { userId, role: AgreementParticipantRole.COUNTERPART },
+      };
+    }
+
+    const where: Prisma.AgreementWhereInput = {
+      participants: participantsFilter,
+    };
+
+    if (status) where.operationalStatus = status;
+    if (type) where.type = type;
+    if (financialStatus) where.financialStatus = financialStatus;
+
+    if (myRole === MyAgreementRole.CREATOR) where.createdById = userId;
+    if (myRole === MyAgreementRole.PAYER) where.payerId = userId;
+    if (myRole === MyAgreementRole.RECEIVER) where.receiverId = userId;
+
+    // hasGuarantee is a shorthand for type filter (does not override explicit type param)
+    if (hasGuarantee === true && !type) where.type = AgreementType.WITH_GUARANTEE;
+    if (hasGuarantee === false && !type) where.type = AgreementType.SIMPLE;
+
+    // inDispute: agreement has an open/blocking dispute
+    if (inDispute === true) {
+      where.dispute = {
+        status: {
+          in: [
+            DisputeStatus.OPEN,
+            DisputeStatus.UNDER_REVIEW,
+            DisputeStatus.AWAITING_EVIDENCE,
+          ],
+        },
+      };
+    }
+
+    // Due date range filter
+    if (dueBefore || dueAfter) {
+      const dueFilter: Prisma.DateTimeNullableFilter = {};
+      if (dueBefore) dueFilter.lte = new Date(dueBefore);
+      if (dueAfter) dueFilter.gte = new Date(dueAfter);
+      where.dueDate = dueFilter;
+    }
+
+    // pendingMyAction: OR of three conditions where the user needs to act
+    if (pendingMyAction === true) {
+      where.OR = [
+        // 1. I'm counterpart and haven't accepted yet
+        {
+          operationalStatus: AgreementOperationalStatus.AWAITING_ACCEPTANCE,
+          participants: {
+            some: {
+              userId,
+              role: AgreementParticipantRole.COUNTERPART,
+              status: AgreementParticipantStatus.PENDING,
+            },
+          },
+        },
+        // 2. I'm the payer and the guarantee awaits my payment
+        {
+          payerId: userId,
+          type: AgreementType.WITH_GUARANTEE,
+          financialStatus: AgreementFinancialStatus.AWAITING_PAYMENT,
+        },
+        // 3. Agreement awaits my confirmation (precise: I haven't sent CONFIRMED yet)
+        {
+          operationalStatus: AgreementOperationalStatus.AWAITING_CONFIRMATION,
+          participants: { some: { userId } },
+          events: {
+            none: {
+              actorId: userId,
+              type: AgreementEventType.CONFIRMED,
+            },
+          },
+        },
+      ];
+    }
 
     const [data, total] = await Promise.all([
       this.prisma.agreement.findMany({
         where,
-        orderBy: { createdAt: 'desc' },
+        orderBy: { updatedAt: 'desc' },
         skip,
         take: limit,
+        select: {
+          id: true,
+          type: true,
+          operationalStatus: true,
+          financialStatus: true,
+          title: true,
+          generatedSummary: true,
+          description: true,
+          amount: true,
+          currency: true,
+          dueDate: true,
+          acceptanceExpiresAt: true,
+          confirmationDeadlineAt: true,
+          confirmationRule: true,
+          createdById: true,
+          payerId: true,
+          receiverId: true,
+          receiverKeySnapshot: true,
+          createdAt: true,
+          updatedAt: true,
+          completedAt: true,
+          canceledAt: true,
+          disputedAt: true,
+          participants: {
+            select: { id: true, userId: true, role: true, status: true, acceptedAt: true },
+          },
+          financialGuarantee: {
+            select: { id: true, status: true, amount: true, currency: true, lockedAt: true },
+          },
+          dispute: {
+            select: { id: true, status: true, reason: true, openedById: true },
+          },
+        },
+      }),
+      this.prisma.agreement.count({ where }),
+    ]);
+
+    return { data, total, page, limit };
+  }
+
+  async getWalletSummary(userId: string) {
+    const now = new Date();
+    const sevenDaysFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+
+    const BLOCKING_STATUSES = new Set<string>([
+      DisputeStatus.OPEN,
+      DisputeStatus.UNDER_REVIEW,
+      DisputeStatus.AWAITING_EVIDENCE,
+    ]);
+    const PROTECTED_GUARANTEE_STATUSES = new Set<string>([
+      FinancialGuaranteeStatus.LOCKED,
+      FinancialGuaranteeStatus.FROZEN_DISPUTE,
+    ]);
+    const TERMINAL_STATUSES = new Set<string>([
+      AgreementOperationalStatus.COMPLETED,
+      AgreementOperationalStatus.CANCELLED,
+    ]);
+
+    const [user, receivingKey, agreements] = await Promise.all([
+      this.prisma.user.findUnique({
+        where: { id: userId },
+        select: {
+          id: true,
+          profile: {
+            select: { fullName: true, displayName: true, avatarUrl: true },
+          },
+          trustScore: { select: { score: true, level: true } },
+        },
+      }),
+      this.prisma.receivingKey.findFirst({
+        where: { userId, status: 'ACTIVE' },
+        select: { key: true, status: true },
+      }),
+      this.prisma.agreement.findMany({
+        where: { participants: { some: { userId } } },
+        orderBy: { updatedAt: 'desc' },
         select: {
           id: true,
           type: true,
@@ -1350,15 +1516,15 @@ export class AgreementsService {
           amount: true,
           currency: true,
           dueDate: true,
-          acceptanceExpiresAt: true,
-          confirmationRule: true,
           createdById: true,
+          payerId: true,
+          receiverId: true,
           createdAt: true,
           updatedAt: true,
           completedAt: true,
           canceledAt: true,
           participants: {
-            select: { id: true, userId: true, role: true, status: true },
+            select: { userId: true, role: true, status: true },
           },
           financialGuarantee: {
             select: { id: true, status: true, amount: true, currency: true },
@@ -1366,12 +1532,200 @@ export class AgreementsService {
           dispute: {
             select: { id: true, status: true },
           },
+          events: {
+            where: { type: AgreementEventType.CONFIRMED },
+            select: { actorId: true },
+          },
         },
       }),
-      this.prisma.agreement.count({ where }),
     ]);
 
-    return { data, total, page, limit };
+    if (!user) throw new Error('Usuário não encontrado.');
+
+    const totals = {
+      activeAgreements: 0,
+      pendingMyAction: 0,
+      pendingOtherPartyAction: 0,
+      awaitingAcceptance: 0,
+      awaitingPayment: 0,
+      awaitingConfirmation: 0,
+      withGuarantee: 0,
+      inDispute: 0,
+      completed: 0,
+      cancelled: 0,
+      dueSoon: 0,
+    };
+
+    const financial = {
+      amountsToReceive: { count: 0, total: 0, currency: 'BRL' },
+      amountsToPay: { count: 0, total: 0, currency: 'BRL' },
+      protectedAmounts: { count: 0, total: 0, currency: 'BRL' },
+    };
+
+    type AgreementCard = (typeof agreements)[number] & {
+      myRole: string | null;
+      isCreator: boolean;
+      isPayer: boolean;
+      isReceiver: boolean;
+    };
+
+    const sectionPendingMyAction: AgreementCard[] = [];
+    const sectionAmountsToReceive: AgreementCard[] = [];
+    const sectionAmountsToPay: AgreementCard[] = [];
+    const sectionActive: AgreementCard[] = [];
+    const sectionWithGuarantee: AgreementCard[] = [];
+    const sectionInDispute: AgreementCard[] = [];
+    const sectionDueSoon: AgreementCard[] = [];
+    const sectionRecent: AgreementCard[] = [];
+
+    for (const a of agreements) {
+      const myParticipant = a.participants.find((p) => p.userId === userId);
+      const myRole = myParticipant?.role ?? null;
+      const isCreator = a.createdById === userId;
+      const isPayer = a.payerId === userId;
+      const isReceiver = a.receiverId === userId;
+      const hasOpenDispute = !!(a.dispute && BLOCKING_STATUSES.has(a.dispute.status));
+      const isTerminal = TERMINAL_STATUSES.has(a.operationalStatus);
+
+      const iAlreadyConfirmed = a.events.some((e) => e.actorId === userId);
+      const card: AgreementCard = { ...a, myRole, isCreator, isPayer, isReceiver };
+
+      // Operational status counts
+      if (a.operationalStatus === AgreementOperationalStatus.ACTIVE)
+        totals.activeAgreements++;
+      if (a.operationalStatus === AgreementOperationalStatus.COMPLETED)
+        totals.completed++;
+      if (a.operationalStatus === AgreementOperationalStatus.CANCELLED)
+        totals.cancelled++;
+      if (a.operationalStatus === AgreementOperationalStatus.AWAITING_ACCEPTANCE)
+        totals.awaitingAcceptance++;
+      if (a.operationalStatus === AgreementOperationalStatus.AWAITING_CONFIRMATION)
+        totals.awaitingConfirmation++;
+      if (a.type === AgreementType.WITH_GUARANTEE) totals.withGuarantee++;
+      if (a.financialStatus === AgreementFinancialStatus.AWAITING_PAYMENT)
+        totals.awaitingPayment++;
+      if (hasOpenDispute) totals.inDispute++;
+
+      // Due soon: non-terminal agreements due in next 7 days
+      const isDueSoon =
+        !!a.dueDate && a.dueDate > now && a.dueDate <= sevenDaysFromNow && !isTerminal;
+      if (isDueSoon) {
+        totals.dueSoon++;
+        if (sectionDueSoon.length < 10) sectionDueSoon.push(card);
+      }
+
+      // Pending my action: user hasn't yet taken the required action
+      // For AWAITING_CONFIRMATION: only pending if user hasn't sent CONFIRMED event yet
+      const isPendingMyAction =
+        (a.operationalStatus === AgreementOperationalStatus.AWAITING_ACCEPTANCE &&
+          myRole === AgreementParticipantRole.COUNTERPART &&
+          myParticipant?.status === AgreementParticipantStatus.PENDING) ||
+        (isPayer &&
+          a.type === AgreementType.WITH_GUARANTEE &&
+          a.financialStatus === AgreementFinancialStatus.AWAITING_PAYMENT) ||
+        (a.operationalStatus === AgreementOperationalStatus.AWAITING_CONFIRMATION &&
+          !iAlreadyConfirmed);
+
+      if (isPendingMyAction) {
+        totals.pendingMyAction++;
+        if (sectionPendingMyAction.length < 10) sectionPendingMyAction.push(card);
+      }
+
+      // Pending other party action: user already acted, waiting for counterpart
+      const isPendingOtherAction =
+        (a.operationalStatus === AgreementOperationalStatus.AWAITING_ACCEPTANCE && isCreator) ||
+        (isReceiver &&
+          a.type === AgreementType.WITH_GUARANTEE &&
+          a.financialStatus === AgreementFinancialStatus.AWAITING_PAYMENT) ||
+        (a.operationalStatus === AgreementOperationalStatus.AWAITING_CONFIRMATION &&
+          iAlreadyConfirmed);
+
+      if (isPendingOtherAction) totals.pendingOtherPartyAction++;
+
+      // Financial aggregations
+      const guaranteeAmount = a.financialGuarantee?.amount
+        ? parseFloat(a.financialGuarantee.amount.toString())
+        : 0;
+
+      // Amounts to receive: I'm the receiver, value is held waiting for payout
+      if (
+        isReceiver &&
+        a.type === AgreementType.WITH_GUARANTEE &&
+        (a.financialStatus === AgreementFinancialStatus.FUNDS_HELD ||
+          a.financialStatus === AgreementFinancialStatus.AWAITING_PAYOUT)
+      ) {
+        financial.amountsToReceive.count++;
+        financial.amountsToReceive.total += guaranteeAmount;
+        if (sectionAmountsToReceive.length < 10) sectionAmountsToReceive.push(card);
+      }
+
+      // Amounts to pay: I'm the payer, guarantee awaits my deposit
+      if (
+        isPayer &&
+        a.type === AgreementType.WITH_GUARANTEE &&
+        a.financialStatus === AgreementFinancialStatus.AWAITING_PAYMENT
+      ) {
+        financial.amountsToPay.count++;
+        financial.amountsToPay.total += parseFloat((a.amount ?? '0').toString());
+        if (sectionAmountsToPay.length < 10) sectionAmountsToPay.push(card);
+      }
+
+      // Protected amounts: locked guarantees (LOCKED or FROZEN_DISPUTE)
+      if (
+        a.financialGuarantee &&
+        PROTECTED_GUARANTEE_STATUSES.has(a.financialGuarantee.status)
+      ) {
+        financial.protectedAmounts.count++;
+        financial.protectedAmounts.total += guaranteeAmount;
+      }
+
+      // Section: active agreements
+      if (
+        a.operationalStatus === AgreementOperationalStatus.ACTIVE &&
+        sectionActive.length < 10
+      ) {
+        sectionActive.push(card);
+      }
+
+      // Section: with guarantee (non-terminal)
+      if (a.type === AgreementType.WITH_GUARANTEE && !isTerminal && sectionWithGuarantee.length < 10) {
+        sectionWithGuarantee.push(card);
+      }
+
+      // Section: in dispute
+      if (hasOpenDispute && sectionInDispute.length < 10) {
+        sectionInDispute.push(card);
+      }
+
+      // Section: recent (first 5 — already ordered by updatedAt desc)
+      if (sectionRecent.length < 5) sectionRecent.push(card);
+    }
+
+    return {
+      user: {
+        id: user.id,
+        displayName: user.profile?.displayName ?? user.profile?.fullName ?? null,
+        avatarUrl: user.profile?.avatarUrl ?? null,
+        trustScore: user.trustScore
+          ? { score: user.trustScore.score, level: user.trustScore.level }
+          : null,
+      },
+      receivingKey: receivingKey
+        ? { key: receivingKey.key, status: receivingKey.status }
+        : null,
+      totals,
+      financial,
+      sections: {
+        pendingMyAction: sectionPendingMyAction,
+        amountsToReceive: sectionAmountsToReceive,
+        amountsToPay: sectionAmountsToPay,
+        active: sectionActive,
+        withGuarantee: sectionWithGuarantee,
+        inDispute: sectionInDispute,
+        dueSoon: sectionDueSoon,
+        recent: sectionRecent,
+      },
+    };
   }
 
   async findOne(userId: string, id: string) {

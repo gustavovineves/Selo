@@ -12,15 +12,8 @@ Um **Acordo** no Selo é um combinado registrado entre duas pessoas com históri
 | Pix | Não | Sim |
 | Cobrança | Não | Sim |
 | Payout | Não | Sim |
-| Disputa financeira | Não | Sim (Fase futura) |
-| Fase | **Fase 4 (atual)** | Fase 5+ |
-
-O Acordo Simples serve para:
-- Registrar um combinado informal com força de registro
-- Convidar a contraparte e aguardar aceite
-- Acompanhar prazo e status
-- Registrar histórico de eventos
-- Preparar o terreno para score de confiança
+| Disputa financeira | Não | Sim |
+| Fase | Fase 4 | Fase 5+ |
 
 ---
 
@@ -53,16 +46,101 @@ COMPLETED
 | COMPLETED | — | — | Imutável |
 | CANCELLED | — | — | Imutável |
 
-> **Nota sobre recusa:** Quando a contraparte recusa (`decline`), dois registros são gerados simultaneamente:
-> - O **evento** (`AgreementEvent`) registrado é do tipo `REJECTED` — identifica que foi uma recusa, não um cancelamento.
-> - O **status operacional** final do acordo (`Agreement.operationalStatus`) fica `CANCELLED` — pois a recusa encerra o acordo antes do aceite, e não existe o estado `DECLINED` no enum.
-> - O **participante** recusante terá `AgreementParticipant.status: REJECTED`.
->
-> Portanto: evento = `REJECTED`, acordo = `CANCELLED`. Esse comportamento foi validado em teste manual.
+> **Nota sobre recusa:** Evento `REJECTED` + `Agreement.operationalStatus = CANCELLED` + `participant.status = REJECTED`. Ver [docs/progresso.md](progresso.md) para detalhes.
 
 ---
 
 ## Endpoints
+
+### `GET /api/v1/agreements/summary`
+
+**Resumo da wallet** — endpoint central para montar a tela inicial do app mobile.
+
+**Auth:** JWT obrigatório
+
+**Response 200:**
+```json
+{
+  "user": {
+    "id": "cm...",
+    "displayName": "João",
+    "avatarUrl": null,
+    "trustScore": { "score": 500, "level": "MEDIUM" }
+  },
+  "receivingKey": {
+    "key": "@joao",
+    "status": "ACTIVE"
+  },
+  "totals": {
+    "activeAgreements": 2,
+    "pendingMyAction": 1,
+    "pendingOtherPartyAction": 1,
+    "awaitingAcceptance": 1,
+    "awaitingPayment": 0,
+    "awaitingConfirmation": 0,
+    "withGuarantee": 1,
+    "inDispute": 0,
+    "completed": 3,
+    "cancelled": 1,
+    "dueSoon": 1
+  },
+  "financial": {
+    "amountsToReceive": { "count": 0, "total": 0, "currency": "BRL" },
+    "amountsToPay": { "count": 0, "total": 0, "currency": "BRL" },
+    "protectedAmounts": { "count": 1, "total": 350.0, "currency": "BRL" }
+  },
+  "sections": {
+    "pendingMyAction": [...],
+    "amountsToReceive": [...],
+    "amountsToPay": [...],
+    "active": [...],
+    "withGuarantee": [...],
+    "inDispute": [...],
+    "dueSoon": [...],
+    "recent": [...]
+  }
+}
+```
+
+**Definições dos campos:**
+
+| Campo | Definição |
+|---|---|
+| `totals.activeAgreements` | Acordos com `operationalStatus = ACTIVE` |
+| `totals.pendingMyAction` | Acordos onde o usuário ainda precisa agir (ver abaixo) |
+| `totals.pendingOtherPartyAction` | Acordos aguardando ação da outra parte |
+| `totals.awaitingAcceptance` | Acordos em `AWAITING_ACCEPTANCE` |
+| `totals.awaitingPayment` | Acordos em `financialStatus = AWAITING_PAYMENT` |
+| `totals.awaitingConfirmation` | Acordos em `operationalStatus = AWAITING_CONFIRMATION` |
+| `totals.withGuarantee` | Acordos do tipo `WITH_GUARANTEE` |
+| `totals.inDispute` | Acordos com disputa `OPEN`, `UNDER_REVIEW` ou `AWAITING_EVIDENCE` |
+| `totals.dueSoon` | Acordos não terminais com `dueDate` nos próximos 7 dias |
+| `financial.amountsToReceive` | Somatório de garantias onde o usuário é receiver com `financialStatus = FUNDS_HELD` ou `AWAITING_PAYOUT` |
+| `financial.amountsToPay` | Somatório de acordos onde o usuário é payer com `financialStatus = AWAITING_PAYMENT` |
+| `financial.protectedAmounts` | Somatório de garantias `LOCKED` ou `FROZEN_DISPUTE` |
+
+**Lógica de "pendingMyAction" no summary (aproximada):**
+1. Sou contraparte + acordo em `AWAITING_ACCEPTANCE` + meu status = `PENDING`
+2. Sou o pagador + `WITH_GUARANTEE` + `financialStatus = AWAITING_PAYMENT`
+3. Acordo em `AWAITING_CONFIRMATION` (aproximação: inclui quem já confirmou — use a listagem com `pendingMyAction=true` para versão precisa)
+
+**Sections (até 10 itens cada):**
+- `pendingMyAction` — acordos onde o usuário precisa agir (aproximado)
+- `amountsToReceive` — acordos com valores a receber
+- `amountsToPay` — acordos com valores a pagar
+- `active` — acordos ativos
+- `withGuarantee` — acordos com garantia não terminados
+- `inDispute` — acordos em disputa aberta
+- `dueSoon` — acordos vencendo em até 7 dias
+- `recent` — últimos 5 acordos por updatedAt
+
+**Cada item dos sections contém campos extras:**
+- `myRole`: papel do usuário (`CREATOR`, `COUNTERPART` ou null)
+- `isCreator`: se o usuário criou o acordo
+- `isPayer`: se o usuário é o pagador
+- `isReceiver`: se o usuário é o recebedor
+
+---
 
 ### `POST /api/v1/agreements/simple`
 
@@ -96,37 +174,7 @@ Cria um Acordo Simples.
 | `acceptanceExpiresAt` | ISO8601 | Não | Prazo para aceite |
 | `confirmationRule` | enum | Não | `MANUAL` ou `SINGLE_PARTY` (default) |
 
-**Response 201:**
-```json
-{
-  "id": "cm...",
-  "type": "SIMPLE",
-  "operationalStatus": "AWAITING_ACCEPTANCE",
-  "financialStatus": "NONE",
-  "title": "Jogar bola no sábado",
-  "generatedSummary": "Você criou um combinado com João com prazo até 10/06/2026.",
-  "description": "João vai pagar o campo...",
-  "amount": "80.00",
-  "currency": "BRL",
-  "dueDate": "2026-06-10T10:00:00.000Z",
-  "confirmationRule": "SINGLE_PARTY",
-  "createdById": "cm...",
-  "contentHash": "sha256...",
-  "receiverKeySnapshot": {
-    "key": "@joao",
-    "normalizedKey": "joao",
-    "userId": "cm...",
-    "displayName": "João Silva",
-    "avatarUrl": null
-  },
-  "participants": [
-    { "userId": "cm...", "role": "CREATOR", "status": "ACCEPTED" },
-    { "userId": "cm...", "role": "COUNTERPART", "status": "PENDING" }
-  ],
-  "createdAt": "2026-06-04T00:00:00.000Z",
-  "updatedAt": "2026-06-04T00:00:00.000Z"
-}
-```
+**Response 201:** objeto `Agreement` completo com `participants`, `financialGuarantee`, `dispute`
 
 **Erros:**
 - `400` — título inválido, data inválida, criando acordo consigo mesmo
@@ -137,17 +185,48 @@ Cria um Acordo Simples.
 
 ### `GET /api/v1/agreements`
 
-Lista acordos do usuário autenticado (criador ou contraparte).
+Lista acordos do usuário autenticado com filtros server-side.
 
 **Auth:** JWT obrigatório
 
 **Query params:**
 | Param | Tipo | Descrição |
 |---|---|---|
-| `status` | `AgreementOperationalStatus` | Filtrar por status |
+| `status` | `AgreementOperationalStatus` | Filtrar por status operacional |
 | `type` | `AgreementType` | `SIMPLE` ou `WITH_GUARANTEE` |
+| `financialStatus` | `AgreementFinancialStatus` | Filtrar por status financeiro |
+| `myRole` | `creator` \| `counterpart` \| `payer` \| `receiver` | Filtrar pelo papel do usuário no acordo |
+| `pendingMyAction` | `true` \| `false` | Acordos que aguardam ação do usuário (versão precisa) |
+| `hasGuarantee` | `true` \| `false` | Atalho para filtro por tipo (não sobrescreve `type`) |
+| `inDispute` | `true` \| `false` | Acordos com disputa bloqueante aberta |
+| `dueBefore` | ISO8601 | Acordos com prazo até esta data |
+| `dueAfter` | ISO8601 | Acordos com prazo a partir desta data |
 | `page` | number | Default 1 |
 | `limit` | number | Default 20, máx 100 |
+
+**Lógica de `pendingMyAction=true` (precisa via Prisma):**
+1. `operationalStatus = AWAITING_ACCEPTANCE` + sou COUNTERPART + meu status = PENDING
+2. `payerId = userId` + tipo `WITH_GUARANTEE` + `financialStatus = AWAITING_PAYMENT`
+3. `operationalStatus = AWAITING_CONFIRMATION` + **não enviei evento CONFIRMED ainda** (subquery via `events.none`)
+
+**Como separar papéis com `myRole`:**
+| Valor | Seleciona acordos onde... |
+|---|---|
+| `creator` | `createdById = userId` |
+| `counterpart` | usuário tem papel `COUNTERPART` nos participantes |
+| `payer` | `payerId = userId` (criador em acordos WITH_GUARANTEE no MVP) |
+| `receiver` | `receiverId = userId` (contraparte em acordos WITH_GUARANTEE no MVP) |
+
+**Campos na resposta (por item):**
+```
+id, type, operationalStatus, financialStatus, title, generatedSummary,
+description, amount, currency, dueDate, acceptanceExpiresAt,
+confirmationDeadlineAt, confirmationRule, createdById, payerId, receiverId,
+receiverKeySnapshot, createdAt, updatedAt, completedAt, canceledAt, disputedAt,
+participants[{id, userId, role, status, acceptedAt}],
+financialGuarantee[{id, status, amount, currency, lockedAt}],
+dispute[{id, status, reason, openedById}]
+```
 
 **Response 200:**
 ```json
@@ -203,10 +282,6 @@ Recusar o convite de acordo. **Somente a contraparte** pode recusar.
 
 **Response 200:** objeto `Agreement` atualizado (`operationalStatus: "CANCELLED"`, participante com `status: "REJECTED"`)
 
-**Erros:**
-- `400` — acordo não está aguardando aceite
-- `403` — não é a contraparte
-
 ---
 
 ### `POST /api/v1/agreements/:id/cancel`
@@ -237,7 +312,7 @@ Marcar acordo como concluído. **Qualquer participante** pode concluir.
 
 **Regras:**
 - Somente acordos `ACTIVE` podem ser concluídos
-- Quem concluiu fica registrado no evento
+- Acordos `WITH_GUARANTEE` redirecionam para `/confirm-completion`
 
 **Response 200:** objeto `Agreement` atualizado (`operationalStatus: "COMPLETED"`)
 
@@ -249,53 +324,60 @@ Lista o histórico de eventos do acordo em ordem cronológica.
 
 **Auth:** JWT obrigatório — somente participantes
 
-**Response 200:**
-```json
-[
-  {
-    "id": "cm...",
-    "agreementId": "cm...",
-    "actorId": "cm...",
-    "actorType": "USER",
-    "type": "CREATED",
-    "payload": { "counterpartyKey": "@joao" },
-    "note": null,
-    "createdAt": "2026-06-04T00:00:00.000Z"
-  },
-  { "type": "SENT", ... },
-  { "type": "ACCEPTED", ... },
-  { "type": "COMPLETED", ... }
-]
-```
+---
 
-**Tipos de evento registrados:**
-| Evento | Quando |
+## Como o backend diferencia papéis financeiros
+
+No MVP, o **criador** do acordo com garantia é sempre o **pagador** (`payerId`), e a **contraparte** é sempre o **recebedor** (`receiverId`). Em fases futuras, esta relação pode ser invertida (quando o criador é o prestador de serviço que recebe).
+
+| Campo | Significado |
 |---|---|
-| `CREATED` | Criação do acordo |
-| `SENT` | Envio para a contraparte |
-| `ACCEPTED` | Contraparte aceitou |
-| `REJECTED` | Contraparte recusou |
-| `CANCELLED` | Cancelamento |
-| `COMPLETED` | Conclusão |
+| `createdById` | Quem criou o acordo |
+| `payerId` | Quem deposita a garantia (WITH_GUARANTEE) |
+| `receiverId` | Quem recebe o payout (WITH_GUARANTEE) |
+| `participants[].role = CREATOR` | Participante que criou (= payer no MVP) |
+| `participants[].role = COUNTERPART` | Participante convidado (= receiver no MVP) |
 
 ---
 
-## Campos automáticos
+## Como identificar "a pagar" e "a receber" pelo frontend
 
-### `generatedSummary`
+```
+Valores a receber:
+  receiverId === myUserId
+  AND type === WITH_GUARANTEE
+  AND financialStatus IN (FUNDS_HELD, AWAITING_PAYOUT)
 
-Frase resumo gerada automaticamente na criação:
+Valores a pagar:
+  payerId === myUserId
+  AND type === WITH_GUARANTEE
+  AND financialStatus === AWAITING_PAYMENT
 
-- `"Você criou um combinado com João com prazo até 10/06/2026."`
-- `"Você criou um combinado com Maria no valor de BRL 80.00 com prazo até 10/06/2026."`
+Valores protegidos (todos):
+  financialGuarantee.status IN (LOCKED, FROZEN_DISPUTE)
+  (independente do papel do usuário)
+```
 
-### `contentHash`
+---
 
-SHA256 dos termos do acordo (título, descrição, chave da contraparte, valor, prazo) calculado no momento da criação. Permite provar a existência dos termos sem blockchain real (Fase 5 fará a submissão real).
+## Como identificar "aguardando minha ação"
 
-### `receiverKeySnapshot`
+Versão precisa via API (use `?pendingMyAction=true`):
+1. `operationalStatus = AWAITING_ACCEPTANCE` + sou COUNTERPART + status PENDING
+2. `payerId = userId` + `WITH_GUARANTEE` + `financialStatus = AWAITING_PAYMENT`
+3. `operationalStatus = AWAITING_CONFIRMATION` + ainda não enviei evento CONFIRMED
 
-Snapshot da chave de recebimento da contraparte no momento da criação. Protege contra alterações futuras.
+Versão no summary (aproximada, sem subquery de eventos):
+- Igual acima, exceto o item 3 que inclui todos em AWAITING_CONFIRMATION
+
+---
+
+## Limitações conhecidas
+
+- **`summary.totals.pendingMyAction`** inclui usuários que já confirmaram conclusão mas ainda esperam a outra parte. É uma aproximação. Para contagem precisa use `GET /agreements?pendingMyAction=true` + `count`.
+- **Filtros `hasGuarantee` e `type` não se sobrepõem**: se ambos forem fornecidos, `type` prevalece.
+- **`financial.amountsToReceive` e `amountsToPay` são em BRL apenas** — somatório por `currency` será implementado quando múltiplas moedas forem suportadas.
+- **Pix e Fitbank continuam simulados** — nenhuma movimentação financeira real ocorre.
 
 ---
 
@@ -320,12 +402,12 @@ Snapshot da chave de recebimento da contraparte no momento da criação. Protege
 $bodyA = '{"email":"usera@selo.dev","password":"senha-123","firstName":"User","lastName":"A"}'
 $regA = Invoke-RestMethod -Uri "http://localhost:3000/api/v1/auth/register" -Method Post -Body $bodyA -ContentType "application/json"
 $tokenA = $regA.accessToken
+$userAId = (Invoke-RestMethod -Uri "http://localhost:3000/api/v1/auth/me" -Headers @{ Authorization = "Bearer $tokenA" }).id
 
 # Criar chave para usuário A
-$body = '{"key":"@usera"}'
 Invoke-RestMethod -Uri "http://localhost:3000/api/v1/receiving-keys" -Method Post `
   -Headers @{ Authorization = "Bearer $tokenA" } `
-  -Body $body -ContentType "application/json"
+  -Body '{"key":"@usera"}' -ContentType "application/json"
 
 # Usuário B — contraparte
 $bodyB = '{"email":"userb@selo.dev","password":"senha-123","firstName":"User","lastName":"B"}'
@@ -333,131 +415,102 @@ $regB = Invoke-RestMethod -Uri "http://localhost:3000/api/v1/auth/register" -Met
 $tokenB = $regB.accessToken
 
 # Criar chave para usuário B
-$body = '{"key":"@userb"}'
 Invoke-RestMethod -Uri "http://localhost:3000/api/v1/receiving-keys" -Method Post `
   -Headers @{ Authorization = "Bearer $tokenB" } `
-  -Body $body -ContentType "application/json"
+  -Body '{"key":"@userb"}' -ContentType "application/json"
 ```
 
-### Criar acordo (usuário A envia para B)
+### Summary da wallet (home)
 
 ```powershell
+# Summary de A (antes de criar acordos — tudo zerado)
+Invoke-RestMethod -Uri "http://localhost:3000/api/v1/agreements/summary" `
+  -Headers @{ Authorization = "Bearer $tokenA" } | ConvertTo-Json -Depth 6
+
+# Summary de A após criar um acordo com B
 $body = '{"title":"Pagar o almoço","counterpartyKey":"@userb","amount":45.50,"dueDate":"2026-06-15T12:00:00.000Z"}'
 $acordo = Invoke-RestMethod -Uri "http://localhost:3000/api/v1/agreements/simple" -Method Post `
-  -Headers @{ Authorization = "Bearer $tokenA" } `
-  -Body $body -ContentType "application/json"
+  -Headers @{ Authorization = "Bearer $tokenA" } -Body $body -ContentType "application/json"
 $acordoId = $acordo.id
-$acordoId
-$acordo | ConvertTo-Json -Depth 5
+
+# Summary de A: pendingOtherPartyAction deve ser 1 (aguardando B aceitar)
+Invoke-RestMethod -Uri "http://localhost:3000/api/v1/agreements/summary" `
+  -Headers @{ Authorization = "Bearer $tokenA" } | ConvertTo-Json -Depth 4
+
+# Summary de B: pendingMyAction deve ser 1 (B precisa aceitar)
+Invoke-RestMethod -Uri "http://localhost:3000/api/v1/agreements/summary" `
+  -Headers @{ Authorization = "Bearer $tokenB" } | ConvertTo-Json -Depth 4
 ```
 
-### Listar acordos
+### Novos filtros da listagem
 
 ```powershell
-# Acordos do usuário A (criador)
-Invoke-RestMethod -Uri "http://localhost:3000/api/v1/agreements" `
-  -Headers @{ Authorization = "Bearer $tokenA" } | ConvertTo-Json -Depth 5
+# Acordos aguardando minha ação (B)
+Invoke-RestMethod -Uri "http://localhost:3000/api/v1/agreements?pendingMyAction=true" `
+  -Headers @{ Authorization = "Bearer $tokenB" } | ConvertTo-Json -Depth 4
 
-# Acordos do usuário B (contraparte)
-Invoke-RestMethod -Uri "http://localhost:3000/api/v1/agreements" `
-  -Headers @{ Authorization = "Bearer $tokenB" } | ConvertTo-Json -Depth 5
-```
+# Acordos onde sou o criador
+Invoke-RestMethod -Uri "http://localhost:3000/api/v1/agreements?myRole=creator" `
+  -Headers @{ Authorization = "Bearer $tokenA" } | ConvertTo-Json -Depth 3
 
-### Usuário B vê detalhe
+# Acordos onde sou a contraparte
+Invoke-RestMethod -Uri "http://localhost:3000/api/v1/agreements?myRole=counterpart" `
+  -Headers @{ Authorization = "Bearer $tokenB" } | ConvertTo-Json -Depth 3
 
-```powershell
-Invoke-RestMethod -Uri "http://localhost:3000/api/v1/agreements/$acordoId" `
-  -Headers @{ Authorization = "Bearer $tokenB" } | ConvertTo-Json -Depth 5
-```
+# Acordos com garantia em disputa
+Invoke-RestMethod -Uri "http://localhost:3000/api/v1/agreements?hasGuarantee=true&inDispute=true" `
+  -Headers @{ Authorization = "Bearer $tokenA" } | ConvertTo-Json -Depth 3
 
-### Usuário B aceita
+# Acordos vencendo até uma data
+Invoke-RestMethod -Uri "http://localhost:3000/api/v1/agreements?dueBefore=2026-06-20T00:00:00.000Z" `
+  -Headers @{ Authorization = "Bearer $tokenA" } | ConvertTo-Json -Depth 3
 
-```powershell
-Invoke-RestMethod -Uri "http://localhost:3000/api/v1/agreements/$acordoId/accept" -Method Post `
-  -Headers @{ Authorization = "Bearer $tokenB" } | ConvertTo-Json -Depth 5
-```
-
-### Usuário A vê acordo ativo
-
-```powershell
-Invoke-RestMethod -Uri "http://localhost:3000/api/v1/agreements/$acordoId" `
+# Acordos por status financeiro
+Invoke-RestMethod -Uri "http://localhost:3000/api/v1/agreements?financialStatus=FUNDS_HELD" `
   -Headers @{ Authorization = "Bearer $tokenA" } | ConvertTo-Json -Depth 3
 ```
 
-### Usuário A conclui
+### Fluxo completo com summary
 
 ```powershell
-Invoke-RestMethod -Uri "http://localhost:3000/api/v1/agreements/$acordoId/complete" -Method Post `
+# ─── Setup ───────────────────────────────────────────────────────────────────
+$bodyA = '{"email":"pagador2@selo.dev","password":"senha-dev-123","firstName":"Joao","lastName":"Pagador"}'
+$regA = Invoke-RestMethod -Uri "http://localhost:3000/api/v1/auth/register" -Method Post -Body $bodyA -ContentType "application/json"
+$tokenA = $regA.accessToken
+$bodyB = '{"email":"recebedor2@selo.dev","password":"senha-dev-123","firstName":"Maria","lastName":"Recebedora"}'
+$regB = Invoke-RestMethod -Uri "http://localhost:3000/api/v1/auth/register" -Method Post -Body $bodyB -ContentType "application/json"
+$tokenB = $regB.accessToken
+Invoke-RestMethod -Uri "http://localhost:3000/api/v1/receiving-keys" -Method Post -Headers @{ Authorization = "Bearer $tokenB" } -Body '{"key":"@maria2"}' -ContentType "application/json"
+
+# ─── Acordo com garantia ──────────────────────────────────────────────────────
+$body = '{"title":"Serviço de design","counterpartyKey":"@maria2","amount":350.00}'
+$ac = Invoke-RestMethod -Uri "http://localhost:3000/api/v1/agreements/guaranteed" -Method Post `
+  -Headers @{ Authorization = "Bearer $tokenA" } -Body $body -ContentType "application/json"
+$id = $ac.id
+Write-Host "Acordo: $id"
+
+# B aceita
+Invoke-RestMethod -Uri "http://localhost:3000/api/v1/agreements/$id/accept" -Method Post -Headers @{ Authorization = "Bearer $tokenB" }
+
+# Summary A: amountsToPay.total deve ser 350
+Invoke-RestMethod -Uri "http://localhost:3000/api/v1/agreements/summary" `
+  -Headers @{ Authorization = "Bearer $tokenA" } | Select-Object -ExpandProperty financial | ConvertTo-Json
+
+# A paga
+$pi = Invoke-RestMethod -Uri "http://localhost:3000/api/v1/agreements/$id/payment-intents" -Method Post -Headers @{ Authorization = "Bearer $tokenA" }
+Invoke-RestMethod -Uri "http://localhost:3000/api/v1/payments/$($pi.id)/simulate-confirmation" -Method Post -Headers @{ Authorization = "Bearer $tokenA" }
+
+# Summary B: amountsToReceive.total deve ser 350
+Invoke-RestMethod -Uri "http://localhost:3000/api/v1/agreements/summary" `
+  -Headers @{ Authorization = "Bearer $tokenB" } | Select-Object -ExpandProperty financial | ConvertTo-Json
+
+# Summary: protectedAmounts deve ser 350
+Invoke-RestMethod -Uri "http://localhost:3000/api/v1/agreements/summary" `
+  -Headers @{ Authorization = "Bearer $tokenA" } | Select-Object -ExpandProperty financial | ConvertTo-Json
+
+# Listagem com filtro financialStatus=FUNDS_HELD
+Invoke-RestMethod -Uri "http://localhost:3000/api/v1/agreements?financialStatus=FUNDS_HELD" `
   -Headers @{ Authorization = "Bearer $tokenA" } | ConvertTo-Json -Depth 3
-```
-
-### Ver histórico de eventos
-
-```powershell
-Invoke-RestMethod -Uri "http://localhost:3000/api/v1/agreements/$acordoId/events" `
-  -Headers @{ Authorization = "Bearer $tokenA" } | ConvertTo-Json -Depth 5
-```
-
-### Testar recusa (novo acordo)
-
-```powershell
-$body = '{"title":"Buscar o notebook","counterpartyKey":"@userb"}'
-$acordo2 = Invoke-RestMethod -Uri "http://localhost:3000/api/v1/agreements/simple" -Method Post `
-  -Headers @{ Authorization = "Bearer $tokenA" } `
-  -Body $body -ContentType "application/json"
-$id2 = $acordo2.id
-
-# B recusa
-$body = '{"reason":"Não consigo ir até lá."}'
-Invoke-RestMethod -Uri "http://localhost:3000/api/v1/agreements/$id2/decline" -Method Post `
-  -Headers @{ Authorization = "Bearer $tokenB" } `
-  -Body $body -ContentType "application/json" | ConvertTo-Json -Depth 3
-
-# Resultado esperado:
-# acordo.operationalStatus = "CANCELLED"   ← o acordo está encerrado
-# participante B: status = "REJECTED"      ← identifica que foi uma recusa
-# evento registrado: type = "REJECTED"     ← evento distinto de CANCELLED
-
-# Ver eventos para confirmar o tipo correto
-Invoke-RestMethod -Uri "http://localhost:3000/api/v1/agreements/$id2/events" `
-  -Headers @{ Authorization = "Bearer $tokenA" } | ConvertTo-Json -Depth 5
-```
-
-### Testar cancelamento (novo acordo)
-
-```powershell
-$body = '{"title":"Reunião amanhã","counterpartyKey":"@userb"}'
-$acordo3 = Invoke-RestMethod -Uri "http://localhost:3000/api/v1/agreements/simple" -Method Post `
-  -Headers @{ Authorization = "Bearer $tokenA" } `
-  -Body $body -ContentType "application/json"
-$id3 = $acordo3.id
-
-# A cancela enquanto aguarda aceite
-$body = '{"reason":"Mudei de planos."}'
-Invoke-RestMethod -Uri "http://localhost:3000/api/v1/agreements/$id3/cancel" -Method Post `
-  -Headers @{ Authorization = "Bearer $tokenA" } `
-  -Body $body -ContentType "application/json" | ConvertTo-Json -Depth 3
-```
-
-### Tentar aceitar acordo cancelado (deve retornar 400)
-
-```powershell
-try {
-  Invoke-RestMethod -Uri "http://localhost:3000/api/v1/agreements/$id3/accept" -Method Post `
-    -Headers @{ Authorization = "Bearer $tokenB" }
-} catch {
-  "Status: $($_.Exception.Response.StatusCode)" # deve ser 400
-}
-```
-
-### Filtrar por status
-
-```powershell
-Invoke-RestMethod -Uri "http://localhost:3000/api/v1/agreements?status=ACTIVE" `
-  -Headers @{ Authorization = "Bearer $tokenA" } | ConvertTo-Json
-
-Invoke-RestMethod -Uri "http://localhost:3000/api/v1/agreements?status=COMPLETED" `
-  -Headers @{ Authorization = "Bearer $tokenA" } | ConvertTo-Json
 ```
 
 ---
@@ -481,47 +534,12 @@ Invoke-RestMethod -Uri "http://localhost:3000/api/v1/agreements?status=COMPLETED
 
 ---
 
-## Histórico de Testes Manuais
-
-### Status: ✅ Testado manualmente em 2026-06-04
-
-| Fluxo | Resultado |
-|---|---|
-| Criar acordo simples (A → B) | ✅ OK — 201 com `operationalStatus: AWAITING_ACCEPTANCE` |
-| Listar acordos do criador (A) | ✅ OK — aparece na listagem |
-| Listar acordos da contraparte (B) | ✅ OK — aparece na listagem |
-| Ver detalhe do acordo (B) | ✅ OK — participantes e perfis retornados |
-| Aceitar acordo (B aceita) | ✅ OK — status vai para `ACTIVE`, evento `ACCEPTED` registrado |
-| Concluir acordo (A conclui) | ✅ OK — status vai para `COMPLETED`, evento `COMPLETED` registrado |
-| Ver histórico de eventos | ✅ OK — sequência `CREATED → SENT → ACCEPTED → COMPLETED` |
-| **Recusar acordo (B recusa)** | ✅ OK — evento `REJECTED`, acordo `CANCELLED`, participante `REJECTED` |
-| Cancelar enquanto aguarda aceite (A cancela) | ✅ OK — status vai para `CANCELLED`, evento `CANCELLED` |
-| Tentar aceitar acordo já cancelado | ✅ OK — retorna `400` |
-| Filtrar acordos por `status=ACTIVE` | ✅ OK |
-| Filtrar acordos por `status=COMPLETED` | ✅ OK |
-| Tentar acessar acordo de outro usuário | ✅ OK — retorna `403` |
-| Criar acordo consigo mesmo | ✅ OK — retorna `400` |
-
-### Comportamento confirmado: recusa vs. cancelamento
-
-A recusa pela contraparte e o cancelamento são **semanticamente distintos**, mas compartilham o mesmo status operacional final (`CANCELLED`). A diferença está nos registros de evento e participante:
-
-| Ação | `AgreementEvent.type` | `Agreement.operationalStatus` | `AgreementParticipant.status` |
-|---|---|---|---|
-| Contraparte recusa | `REJECTED` | `CANCELLED` | `REJECTED` (apenas a contraparte) |
-| Criador cancela (em AWAITING) | `CANCELLED` | `CANCELLED` | sem alteração |
-| Qualquer um cancela (em ACTIVE) | `CANCELLED` | `CANCELLED` | sem alteração |
-
-Essa distinção permite que o histórico de eventos identifique **por que** um acordo foi encerrado, mesmo que o status final seja o mesmo.
-
----
-
 ## Arquivos implementados
 
-- `apps/api/src/modules/agreements/agreements.service.ts`
-- `apps/api/src/modules/agreements/agreements.controller.ts`
+- `apps/api/src/modules/agreements/agreements.service.ts` — `getWalletSummary`, `findAllByUser` (atualizado)
+- `apps/api/src/modules/agreements/agreements.controller.ts` — `GET /summary` (antes de `GET /:id`)
+- `apps/api/src/modules/agreements/dto/list-agreements.dto.ts` — novos filtros + `MyAgreementRole` enum
 - `apps/api/src/modules/agreements/dto/create-simple-agreement.dto.ts`
 - `apps/api/src/modules/agreements/dto/cancel-agreement.dto.ts`
 - `apps/api/src/modules/agreements/dto/decline-agreement.dto.ts`
-- `apps/api/src/modules/agreements/dto/list-agreements.dto.ts`
 - `apps/api/src/modules/agreement-events/agreement-events.service.ts`
