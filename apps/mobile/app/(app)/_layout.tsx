@@ -1,9 +1,10 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Tabs } from 'expo-router';
 import { View, TouchableOpacity, StyleSheet } from 'react-native';
 import type { TouchableOpacityProps } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Shadow } from '../../src/theme';
+import { notificationsService, setUnreadCountListener } from '../../src/services/notifications.service';
 
 function CreateTabButton({ onPress }: TouchableOpacityProps) {
   return (
@@ -16,6 +17,23 @@ function CreateTabButton({ onPress }: TouchableOpacityProps) {
 }
 
 export default function AppLayout() {
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  useEffect(() => {
+    // Registra listener para atualizações vindas da tela de notificações
+    setUnreadCountListener(setUnreadCount);
+
+    // Busca o contador inicial
+    notificationsService
+      .getUnreadCount()
+      .then(({ count }) => setUnreadCount(count))
+      .catch(() => {});
+
+    return () => {
+      setUnreadCountListener(() => {});
+    };
+  }, []);
+
   return (
     <Tabs
       screenOptions={{
@@ -54,6 +72,18 @@ export default function AppLayout() {
           title: '',
           headerTitle: 'Criar Combinado',
           tabBarButton: (props) => <CreateTabButton {...props} />,
+        }}
+      />
+      <Tabs.Screen
+        name="notifications"
+        options={{
+          title: 'Atividades',
+          headerTitle: 'Atividades',
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="notifications-outline" size={size} color={color} />
+          ),
+          tabBarBadge: unreadCount > 0 ? unreadCount : undefined,
+          tabBarBadgeStyle: { fontSize: 10, minWidth: 16, height: 16, lineHeight: 16 },
         }}
       />
       <Tabs.Screen

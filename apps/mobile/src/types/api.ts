@@ -325,3 +325,45 @@ export interface AddEvidencePayload {
   content: string;
   type?: 'TEXT' | 'EVIDENCE';
 }
+
+export type NotificationType =
+  | 'AGREEMENT_RECEIVED'
+  | 'AGREEMENT_ACCEPTED'
+  | 'AGREEMENT_REJECTED'
+  | 'AGREEMENT_COMPLETED'
+  | 'AGREEMENT_CANCELLED'
+  | 'AGREEMENT_EXPIRED'
+  | 'PAYMENT_RECEIVED'
+  | 'FUNDS_LOCKED'
+  | 'PAYOUT_SENT'
+  | 'REFUND_PROCESSED'
+  | 'DISPUTE_OPENED'
+  | 'DISPUTE_RESOLVED'
+  | 'TRUST_SCORE_UPDATED'
+  | 'SYSTEM_ALERT';
+
+export type NotificationStatus = 'UNREAD' | 'READ' | 'DISMISSED';
+
+export interface AppNotification {
+  id: string;
+  userId: string;
+  type: NotificationType;
+  status: NotificationStatus;
+  title: string;
+  body: string;
+  data: Record<string, unknown> | null;
+  readAt: string | null;
+  sentAt: string | null;
+  createdAt: string;
+}
+
+export interface NotificationListResponse {
+  data: AppNotification[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
+export interface UnreadCountResponse {
+  count: number;
+}

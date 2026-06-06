@@ -623,7 +623,141 @@ Requisição qualquer (ex: GET /agreements)
 | Limitação | Quando resolve |
 |---|---|
 | Upload de avatar de perfil | Fase 14 |
-| Notificações push locais (Expo Notifications) | Fase 14 |
-| Botão "Reembolsar" no app mobile | Fase 14 |
+| Notificações in-app (central de atividades) | Fase 14 ✅ |
+| Botão "Reembolsar" no app mobile | Fora do escopo do usuário |
 | Validação de pixKey com Banco Central | Produção (Fitbank) |
-| Animações entre telas | Fase 14 |
+| Animações entre telas | Futuro |
+
+---
+
+## Fase 14 — Notificações In-App e Central de Atividades (Implementado)
+
+### Objetivo
+
+Criar uma central de notificações dentro do app para avisar o usuário sobre eventos importantes dos combinados. Sem push notification real — notificações são apenas in-app.
+
+### O que foi implementado
+
+**Backend:**
+- `NotificationsService` aprimorado: `findAllByUser` com paginação, filtros por status/tipo; `getUnreadCount`
+- `NotificationsController` expandido: `GET /unread-count`, filtros de query (`read`, `type`, `page`, `limit`), suporte a `POST` além de `PATCH` para `/:id/read` e `/read-all`
+- Geração automática de notificações em `AgreementsService`: acordo recebido, aceito, recusado, cancelado, concluído, aguardando confirmação, valor protegido (dupla confirmação), liberação, reembolso, contestação aberta
+- Geração em `PaymentsService`: valor protegido (`FUNDS_LOCKED`) após `simulate-confirmation`
+- Geração em `AdminService`: contestação resolvida — liberação e reembolso — com notificações para ambos os participantes
+
+**Mobile:**
+- `src/services/notifications.service.ts` — `list`, `getUnreadCount`, `markAsRead`, `markAllAsRead` + listener module-level para badge
+- `src/types/api.ts` — `AppNotification`, `NotificationType`, `NotificationStatus`, `NotificationListResponse`, `UnreadCountResponse`
+- `app/(app)/notifications.tsx` — tela "Atividades" completa
+- `app/(app)/_layout.tsx` — nova aba "Atividades" com badge de não lidas (posição simétrica: Home | Combinados | [+] | Atividades | Perfil)
+
+### Tela Atividades (notifications.tsx)
+
+| Elemento | Descrição |
+|---|---|
+| Barra de ações | Contador de atividades + não lidas; botão "Marcar todas como lidas" |
+| Lista de notificações | FlatList com pull-to-refresh e separadores |
+| Item de notificação | Ícone colorido por tipo, título, corpo, data relativa, ponto de não lida |
+| Estado vazio | EmptyState com ícone de sino desativado e mensagem explicativa |
+| Estado de erro | EmptyState + botão "Tentar novamente" |
+| Ação no item | Marca como lida + navega para o acordo relacionado (se houver `agreementId`) |
+| Pull-to-refresh | RefreshControl com `useFocusEffect` — recarrega ao focar a aba |
+
+### Ícones e cores por tipo de notificação
+
+| Tipo | Ícone | Cor | Texto humano |
+|---|---|---|---|
+| AGREEMENT_RECEIVED | document-text-outline | Primary | Combinado recebido |
+| AGREEMENT_ACCEPTED | checkmark-circle-outline | Accent (verde) | Aceito |
+| AGREEMENT_REJECTED | close-circle-outline | Danger (vermelho) | Recusado |
+| AGREEMENT_COMPLETED | ribbon-outline | Accent | Concluído |
+| AGREEMENT_CANCELLED | ban-outline | TextMuted | Cancelado |
+| FUNDS_LOCKED | lock-closed-outline | Primary | Valor protegido |
+| PAYOUT_SENT | arrow-up-circle-outline | Accent | Liberado |
+| REFUND_PROCESSED | return-down-back-outline | Warning | Reembolso |
+| DISPUTE_OPENED | alert-circle-outline | Danger | Contestação |
+| DISPUTE_RESOLVED | checkmark-done-outline | Primary | Análise concluída |
+| SYSTEM_ALERT | information-circle-outline | TextMuted | Aviso |
+
+### Geração de notificações por evento
+
+| Evento | Quem recebe | Tipo | Título |
+|---|---|---|---|
+| Acordo simples criado | Contraparte | AGREEMENT_RECEIVED | "Você recebeu um combinado" |
+| Acordo c/ garantia criado | Contraparte | AGREEMENT_RECEIVED | "Você recebeu um combinado com valor protegido" |
+| Acordo aceito | Criador | AGREEMENT_ACCEPTED | "Combinado aceito" |
+| Acordo recusado | Criador | AGREEMENT_REJECTED | "Combinado recusado" |
+| Acordo cancelado | Outros participantes | AGREEMENT_CANCELLED | "Combinado cancelado" |
+| Acordo concluído (simples) | Outros participantes | AGREEMENT_COMPLETED | "Combinado concluído" |
+| 1ª confirmação (dupla) | Outra parte | SYSTEM_ALERT | "Aguardando sua confirmação" |
+| 2ª confirmação (payout) | Receptor | PAYOUT_SENT | "Pagamento liberado" |
+| 2ª confirmação (payout) | Pagador | AGREEMENT_COMPLETED | "Combinado concluído" |
+| Release manual | Receptor | PAYOUT_SENT | "Pagamento liberado" |
+| Release manual | Outros | AGREEMENT_COMPLETED | "Combinado concluído" |
+| Simulate-confirmation | Pagador | FUNDS_LOCKED | "Valor protegido" |
+| Simulate-confirmation | Receptor | FUNDS_LOCKED | "Valor protegido" |
+| Contestação aberta | Abridor | DISPUTE_OPENED | "Contestação registrada" |
+| Contestação aberta | Outra parte | DISPUTE_OPENED | "Contestação aberta" |
+| Reembolso (usuário) | Pagador | REFUND_PROCESSED | "Reembolso registrado" |
+| Admin resolve-release | Receptor | PAYOUT_SENT | "Contestação resolvida — valor liberado" |
+| Admin resolve-release | Pagador | DISPUTE_RESOLVED | "Contestação resolvida" |
+| Admin resolve-refund | Pagador | REFUND_PROCESSED | "Contestação resolvida — reembolso registrado" |
+| Admin resolve-refund | Receptor | DISPUTE_RESOLVED | "Contestação resolvida" |
+
+### Endpoints criados/alterados
+
+| Método | Rota | Descrição |
+|---|---|---|
+| GET | `/api/v1/notifications` | Lista notificações com filtros (`read`, `type`, `page`, `limit`, `unreadOnly`) |
+| GET | `/api/v1/notifications/unread-count` | Contador de não lidas |
+| POST/PATCH | `/api/v1/notifications/:id/read` | Marca uma notificação como lida |
+| POST/PATCH | `/api/v1/notifications/read-all` | Marca todas como lidas |
+
+### Badge de não lidas
+
+- `(app)/_layout.tsx` busca `GET /notifications/unread-count` no mount
+- Badge mostrado na aba "Atividades" enquanto houver notificações não lidas
+- Badge atualizado automaticamente via listener module-level `notifyUnreadCountChanged()`
+- Ao marcar todas como lidas em `markAllAsRead()`, o listener é chamado com `0`
+- Ao abrir a tela, `useFocusEffect` recarrega a lista e atualiza o listener
+
+### Arquivos criados
+
+| Arquivo | Descrição |
+|---|---|
+| `apps/mobile/src/services/notifications.service.ts` | `list`, `getUnreadCount`, `markAsRead`, `markAllAsRead` + listener de badge |
+| `apps/mobile/app/(app)/notifications.tsx` | Tela "Atividades" com lista, badge, retry, pull-to-refresh |
+
+### Arquivos alterados
+
+| Arquivo | O que mudou |
+|---|---|
+| `apps/api/src/modules/notifications/notifications.service.ts` | `findAllByUser` com paginação; `getUnreadCount`; tipagem forte com `NotificationType` |
+| `apps/api/src/modules/notifications/notifications.controller.ts` | `GET /unread-count`; filtros de query; `@Post` em `/read-all` e `/:id/read` |
+| `apps/api/src/modules/agreements/agreements.module.ts` | Importa `NotificationsModule` |
+| `apps/api/src/modules/agreements/agreements.service.ts` | Injeta `NotificationsService`; dispara notificações em 10 eventos |
+| `apps/api/src/modules/payments/payments.module.ts` | Importa `NotificationsModule` |
+| `apps/api/src/modules/payments/payments.service.ts` | Injeta `NotificationsService`; dispara `FUNDS_LOCKED` |
+| `apps/api/src/modules/admin/admin.module.ts` | Importa `NotificationsModule` |
+| `apps/api/src/modules/admin/admin.service.ts` | Injeta `NotificationsService`; dispara `DISPUTE_RESOLVED` em resolve-release e resolve-refund |
+| `apps/mobile/src/types/api.ts` | `AppNotification`, `NotificationType`, `NotificationStatus`, `NotificationListResponse`, `UnreadCountResponse` |
+| `apps/mobile/app/(app)/_layout.tsx` | Aba "Atividades" com badge; listener de unread-count no mount |
+
+### Decisões desta fase
+
+- **Notificações são fire-and-forget**: chamadas com `.catch(() => {})` — falha na notificação não desfaz a operação principal
+- **Sem push notification real**: todas as notificações são in-app apenas. Expo Notifications não foi implementada.
+- **Listener module-level** em vez de Context: evita Provider extra e acoplamento React desnecessário para o caso de uso simples de badge de contador
+- **`useFocusEffect`** na tela de notificações: recarrega ao focar a aba — badge sempre reflete o estado real após visitar a tela
+- **Schema não foi alterado**: todos os campos do modelo `Notification` já existiam (`id`, `userId`, `type`, `status`, `title`, `body`, `data`, `readAt`, `sentAt`, `createdAt`)
+- **`NotificationType` existente atendeu todos os casos**: nenhum enum novo necessário
+
+### Limitações desta fase (Fase 14)
+
+| Limitação | Quando resolve |
+|---|---|
+| Push notifications reais (Expo Notifications) | Fora do escopo do MVP mobile |
+| Upload de avatar de perfil | Futuro |
+| Badge não atualiza em segundo plano | Requer push notifications reais |
+| Paginação infinita na lista de notificações | Futuro |
+| Filtro por tipo na tela | Futuro |

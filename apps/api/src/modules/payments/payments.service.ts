@@ -19,6 +19,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { AuditLogsService } from '../audit-logs/audit-logs.service';
 import { TrustScoreService } from '../trust-score/trust-score.service';
 import { BlockchainRecordsService } from '../blockchain-records/blockchain-records.service';
+import { NotificationsService } from '../notifications/notifications.service';
 
 @Injectable()
 export class PaymentsService {
@@ -27,6 +28,7 @@ export class PaymentsService {
     private readonly auditLogs: AuditLogsService,
     private readonly trustScore: TrustScoreService,
     private readonly blockchainRecords: BlockchainRecordsService,
+    private readonly notifications: NotificationsService,
   ) {}
 
   async simulateConfirmation(userId: string, paymentIntentId: string) {
@@ -133,6 +135,23 @@ export class PaymentsService {
       currency: guarantee.currency,
       timestamp: now.toISOString(),
     });
+
+    // Notifica todos os participantes: valor protegido
+    for (const p of agreement.participants) {
+      if (!p.userId) continue;
+      const isPayer = p.userId === userId;
+      this.notifications
+        .send(
+          p.userId,
+          'FUNDS_LOCKED',
+          'Valor protegido',
+          isPayer
+            ? 'O pagamento foi confirmado e o valor está guardado até a conclusão do acordo.'
+            : 'O pagador confirmou o depósito. O valor está guardado até a conclusão do acordo.',
+          { agreementId: agreement.id },
+        )
+        .catch(() => {});
+    }
 
     return this.prisma.paymentIntent.findUnique({
       where: { id: paymentIntentId },

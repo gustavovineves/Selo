@@ -1,6 +1,6 @@
 # Progresso do Projeto Selo
 
-Última atualização: 2026-06-06 (Fase 13 — Infraestrutura Mobile de Sessão, Refresh JWT e Tratamento Global de Erros)
+Última atualização: 2026-06-06 (Fase 14 — Notificações In-App e Central de Atividades)
 
 ---
 
@@ -42,6 +42,7 @@
 | App Mobile (Pix simulado + contestação formal) | ✅ Implementado (Fase 11) |
 | App Mobile (Perfil, Chave, Destino de Recebimento) | ✅ Implementado (Fase 12) |
 | App Mobile (Refresh JWT, Interceptor 401, Erros Globais) | ✅ Implementado (Fase 13) |
+| App Mobile (Notificações In-App, Central de Atividades, Badge) | ✅ Implementado (Fase 14) |
 | Score de Confiança | ✅ recordEvent implementado (Fase 5 e 6) |
 | Git local | ✅ Limpo após commit da Fase 4 |
 
@@ -649,16 +650,14 @@ Os módulos abaixo existem como stubs (`NotImplementedException`) ou aguardam as
 
 | Funcionalidade | Fase | Módulo |
 |---|---|---|
-| Integração real Fitbank/BaaS | Fase 13 | `pix` + `payments` |
-| Webhook real do PSP | Fase 13 | `pix` |
-| Blockchain (submissão real) | Fase 13 | `blockchain-records` |
-| Painel Admin funcional (Next.js) | Fase 13 | `apps/admin` |
-| Notificações push | Fase 13 | `notifications` |
-| Auth admin real (AdminUser + JWT) | Fase 13 | `admin` |
-| Reembolso pelo app mobile (botão refund) | Fase 14 | `apps/mobile` |
-| Upload de arquivo como evidência de contestação | Fase 14 | `apps/mobile` |
-| Upload de avatar | Fase 14 | `apps/mobile` |
-| Notificações push (Expo Notifications) | Fase 14 | `apps/mobile` |
+| Integração real Fitbank/BaaS | Futuro | `pix` + `payments` |
+| Webhook real do PSP | Futuro | `pix` |
+| Blockchain (submissão real) | Futuro | `blockchain-records` |
+| Painel Admin funcional (Next.js) | Futuro | `apps/admin` |
+| Push notifications reais (Expo Notifications) | Futuro | `notifications` |
+| Auth admin real (AdminUser + JWT) | Futuro | `admin` |
+| Upload de arquivo como evidência de contestação | Futuro | `apps/mobile` |
+| Upload de avatar | Futuro | `apps/mobile` |
 
 ---
 
@@ -708,19 +707,58 @@ Os módulos abaixo existem como stubs (`NotImplementedException`) ou aguardam as
 
 ---
 
+## 5i. Fase 14 — Notificações In-App e Central de Atividades (Implementada)
+
+### O que foi implementado
+
+- **NotificationsService** aprimorado: `findAllByUser` com paginação e filtros; `getUnreadCount`
+- **NotificationsController** expandido: `GET /unread-count`; filtros de query; `POST` além de `PATCH` para marcar como lida
+- **Geração automática de notificações** em `AgreementsService`, `PaymentsService` e `AdminService` — 15+ eventos mapeados
+- **Tela "Atividades"** (`app/(app)/notifications.tsx`): lista com ícones por tipo, data relativa, estados de loading/erro/vazio, pull-to-refresh, "Marcar todas como lidas", navegação para acordo ao tocar
+- **Aba "Atividades"** na Bottom Navigation (5 abas: Home | Combinados | [+] | Atividades | Perfil)
+- **Badge de não lidas** na aba Atividades, atualizado via listener module-level
+
+### Arquivos criados
+
+| Arquivo | Descrição |
+|---|---|
+| `apps/mobile/src/services/notifications.service.ts` | Serviço + listener de badge |
+| `apps/mobile/app/(app)/notifications.tsx` | Tela "Atividades" |
+
+### Arquivos alterados
+
+| Arquivo | O que mudou |
+|---|---|
+| `apps/api/src/modules/notifications/notifications.service.ts` | Paginação, filtros, `getUnreadCount`, tipagem forte |
+| `apps/api/src/modules/notifications/notifications.controller.ts` | `GET /unread-count`; filtros de query; `@Post` em read endpoints |
+| `apps/api/src/modules/agreements/agreements.module.ts` | Importa `NotificationsModule` |
+| `apps/api/src/modules/agreements/agreements.service.ts` | Injeta `NotificationsService`; 10+ eventos notificados |
+| `apps/api/src/modules/payments/payments.module.ts` | Importa `NotificationsModule` |
+| `apps/api/src/modules/payments/payments.service.ts` | Notifica `FUNDS_LOCKED` |
+| `apps/api/src/modules/admin/admin.module.ts` | Importa `NotificationsModule` |
+| `apps/api/src/modules/admin/admin.service.ts` | Notifica `DISPUTE_RESOLVED` em resolve-release/refund |
+| `apps/mobile/src/types/api.ts` | `AppNotification`, `NotificationType`, `NotificationListResponse`, `UnreadCountResponse` |
+| `apps/mobile/app/(app)/_layout.tsx` | Aba Atividades + badge |
+
+### Decisões
+
+- Notificações são fire-and-forget (`.catch(() => {})`) — falha não desfaz a operação principal
+- Schema Prisma não foi alterado
+- Push notifications reais não implementadas (out of scope do MVP)
+- Listener module-level para badge sem overhead de React Context
+
+### Validação
+
+- `pnpm --filter @selo/mobile typecheck` → ✅ Exit 0
+- `pnpm --filter @selo/api build` → ✅ Exit 0
+
+---
+
 ## 7. Próxima Fase
 
-### Fase 14 — Upload de Avatar, Notificações Push e Botão de Reembolso
+Fase 15 sugerida: Upload de avatar, push notifications reais (Expo Notifications), painel admin funcional (Next.js) ou integração Fitbank.
 
-Objetivo: completar o fluxo mobile com upload de avatar, notificações push locais (Expo Notifications) e botão de reembolso pelo app.
-
-O que implementar:
-- Upload de avatar de perfil (PATCH /users/me/profile com avatarUrl ou endpoint dedicado)
-- Notificações push locais (Expo Notifications) para eventos de acordo
-- Botão "Reembolsar" no app para acordos `ACTIVE + FUNDS_HELD` (chama `POST /agreements/:id/refund`)
-- Upload de arquivo como evidência de contestação
-
-Não implementar ainda: Fitbank real, blockchain real, painel admin funcional, KYC.
+Não implementar sem instrução explícita: Fitbank real, blockchain real, KYC, push notifications reais.
 
 ---
 

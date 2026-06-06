@@ -1,20 +1,47 @@
 import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { Prisma, NotificationType, NotificationStatus } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 
 @Injectable()
 export class NotificationsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async findAllByUser(userId: string, unreadOnly = false) {
-    return this.prisma.notification.findMany({
-      where: {
-        userId,
-        ...(unreadOnly ? { status: 'UNREAD' } : {}),
-      },
-      orderBy: { createdAt: 'desc' },
-      take: 50,
+  async findAllByUser(
+    userId: string,
+    opts: {
+      unreadOnly?: boolean;
+      type?: NotificationType;
+      page?: number;
+      limit?: number;
+    } = {},
+  ) {
+    const { unreadOnly, type, page = 1, limit = 30 } = opts;
+    const skip = (page - 1) * limit;
+
+    const where: Prisma.NotificationWhereInput = {
+      userId,
+      ...(unreadOnly ? { status: NotificationStatus.UNREAD } : {}),
+      ...(type ? { type } : {}),
+    };
+
+    const [data, total] = await Promise.all([
+      this.prisma.notification.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: limit,
+      }),
+      this.prisma.notification.count({ where }),
+    ]);
+
+    return { data, total, page, limit };
+  }
+
+  async getUnreadCount(userId: string): Promise<{ count: number }> {
+    const count = await this.prisma.notification.count({
+      where: { userId, status: NotificationStatus.UNREAD },
     });
+    return { count };
   }
 
   async markRead(userId: string, id: string) {
@@ -24,20 +51,20 @@ export class NotificationsService {
 
     return this.prisma.notification.update({
       where: { id },
-      data: { status: 'READ', readAt: new Date() },
+      data: { status: NotificationStatus.READ, readAt: new Date() },
     });
   }
 
   async markAllRead(userId: string) {
     return this.prisma.notification.updateMany({
-      where: { userId, status: 'UNREAD' },
-      data: { status: 'READ', readAt: new Date() },
+      where: { userId, status: NotificationStatus.UNREAD },
+      data: { status: NotificationStatus.READ, readAt: new Date() },
     });
   }
 
   async send(
     userId: string,
-    type: string,
+    type: NotificationType,
     title: string,
     body: string,
     data?: Record<string, unknown>,
@@ -45,7 +72,7 @@ export class NotificationsService {
     return this.prisma.notification.create({
       data: {
         userId,
-        type: type as Parameters<typeof this.prisma.notification.create>[0]['data']['type'],
+        type,
         title,
         body,
         data: data as Prisma.InputJsonValue,

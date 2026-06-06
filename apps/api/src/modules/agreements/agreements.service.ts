@@ -35,6 +35,7 @@ import { AuditLogsService } from '../audit-logs/audit-logs.service';
 import { TrustScoreService } from '../trust-score/trust-score.service';
 import { BlockchainRecordsService } from '../blockchain-records/blockchain-records.service';
 import { ReceivingDestinationsService } from '../receiving-destinations/receiving-destinations.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { CreateSimpleAgreementDto } from './dto/create-simple-agreement.dto';
 import { CreateGuaranteedAgreementDto } from './dto/create-guaranteed-agreement.dto';
 import { ListAgreementsDto, MyAgreementRole } from './dto/list-agreements.dto';
@@ -88,6 +89,7 @@ export class AgreementsService {
     private readonly trustScore: TrustScoreService,
     private readonly blockchainRecords: BlockchainRecordsService,
     private readonly receivingDestinations: ReceivingDestinationsService,
+    private readonly notifications: NotificationsService,
   ) {}
 
   // ── Private helpers ────────────────────────────────────────────
@@ -304,6 +306,16 @@ export class AgreementsService {
       return a;
     });
 
+    this.notifications
+      .send(
+        counterpartyId,
+        'AGREEMENT_RECEIVED',
+        'Você recebeu um combinado',
+        `${creatorName} criou um combinado com você. Revise para aceitar ou recusar.`,
+        { agreementId: agreement.id },
+      )
+      .catch(() => {});
+
     return this.findOne(creatorId, agreement.id);
   }
 
@@ -477,6 +489,17 @@ export class AgreementsService {
       resourceId: agreement.id,
       newData: { type: 'WITH_GUARANTEE', amount: dto.amount },
     });
+
+    const cur = dto.currency ?? 'BRL';
+    this.notifications
+      .send(
+        counterpartyId,
+        'AGREEMENT_RECEIVED',
+        'Você recebeu um combinado com valor protegido',
+        `${creatorName} criou um combinado com garantia de ${cur} ${dto.amount.toFixed(2)} com você. Revise para aceitar ou recusar.`,
+        { agreementId: agreement.id },
+      )
+      .catch(() => {});
 
     return this.findOne(creatorId, agreement.id);
   }
@@ -801,6 +824,33 @@ export class AgreementsService {
       timestamp: now.toISOString(),
     });
 
+    // Notifica receptor (pagamento liberado) e pagador (acordo concluído)
+    for (const p of agreement.participants) {
+      if (!p.userId) continue;
+      const isReceiver = p.userId === agreement.receiverId;
+      if (isReceiver) {
+        this.notifications
+          .send(
+            p.userId,
+            'PAYOUT_SENT',
+            'Pagamento liberado',
+            'O valor do combinado foi liberado para você.',
+            { agreementId },
+          )
+          .catch(() => {});
+      } else if (p.userId !== userId) {
+        this.notifications
+          .send(
+            p.userId,
+            'AGREEMENT_COMPLETED',
+            'Combinado concluído',
+            'O combinado foi concluído e o valor foi liberado ao recebedor.',
+            { agreementId },
+          )
+          .catch(() => {});
+      }
+    }
+
     return this.findOne(userId, agreementId);
   }
 
@@ -923,6 +973,21 @@ export class AgreementsService {
           });
         }
       });
+
+      // Notifica a outra parte que confirmação está pendente
+      for (const p of agreement.participants) {
+        if (p.userId && p.userId !== userId) {
+          this.notifications
+            .send(
+              p.userId,
+              'SYSTEM_ALERT',
+              'Aguardando sua confirmação',
+              `A outra parte confirmou a conclusão do combinado "${agreement.title}". Agora falta você confirmar.`,
+              { agreementId },
+            )
+            .catch(() => {});
+        }
+      }
 
       return this.findOne(userId, agreementId);
     }
@@ -1056,6 +1121,33 @@ export class AgreementsService {
       currency: guarantee.currency,
       timestamp: now.toISOString(),
     });
+
+    // Notifica ambos os participantes: pagamento liberado
+    for (const p of agreement.participants) {
+      if (!p.userId) continue;
+      const isReceiver = p.userId === agreement.receiverId;
+      if (isReceiver) {
+        this.notifications
+          .send(
+            p.userId,
+            'PAYOUT_SENT',
+            'Pagamento liberado',
+            `O combinado "${agreement.title}" foi concluído e o valor foi liberado para você.`,
+            { agreementId },
+          )
+          .catch(() => {});
+      } else {
+        this.notifications
+          .send(
+            p.userId,
+            'AGREEMENT_COMPLETED',
+            'Combinado concluído',
+            `O combinado "${agreement.title}" foi concluído e o valor foi liberado ao recebedor.`,
+            { agreementId },
+          )
+          .catch(() => {});
+      }
+    }
 
     return this.findOne(userId, agreementId);
   }
@@ -1212,6 +1304,18 @@ export class AgreementsService {
       'Reembolso solicitado em acordo com garantia',
     );
 
+    if (agreement.payerId) {
+      this.notifications
+        .send(
+          agreement.payerId,
+          'REFUND_PROCESSED',
+          'Reembolso registrado',
+          `O valor do combinado foi reembolsado.`,
+          { agreementId },
+        )
+        .catch(() => {});
+    }
+
     return this.findOne(userId, agreementId);
   }
 
@@ -1315,6 +1419,31 @@ export class AgreementsService {
       'Agreement',
       'Disputa aberta',
     );
+
+    // Notifica o próprio usuário (confirmação) e a outra parte
+    this.notifications
+      .send(
+        userId,
+        'DISPUTE_OPENED',
+        'Contestação registrada',
+        `Sua contestação para "${agreement.title}" foi registrada. O valor ficou travado até análise.`,
+        { agreementId },
+      )
+      .catch(() => {});
+
+    for (const p of agreement.participants) {
+      if (p.userId && p.userId !== userId) {
+        this.notifications
+          .send(
+            p.userId,
+            'DISPUTE_OPENED',
+            'Contestação aberta',
+            `Uma contestação foi aberta no combinado "${agreement.title}". O valor ficou travado até decisão administrativa.`,
+            { agreementId },
+          )
+          .catch(() => {});
+      }
+    }
 
     return this.findOne(userId, agreementId);
   }
@@ -1833,6 +1962,16 @@ export class AgreementsService {
       });
     });
 
+    this.notifications
+      .send(
+        agreement.createdById,
+        'AGREEMENT_ACCEPTED',
+        'Combinado aceito',
+        `Seu combinado "${agreement.title}" foi aceito.`,
+        { agreementId: id },
+      )
+      .catch(() => {});
+
     return this.findOne(userId, id);
   }
 
@@ -1895,6 +2034,16 @@ export class AgreementsService {
         },
       });
     });
+
+    this.notifications
+      .send(
+        agreement.createdById,
+        'AGREEMENT_REJECTED',
+        'Combinado recusado',
+        `Seu combinado "${agreement.title}" foi recusado.`,
+        { agreementId: id },
+      )
+      .catch(() => {});
 
     return this.findOne(userId, id);
   }
@@ -1963,6 +2112,20 @@ export class AgreementsService {
       });
     });
 
+    for (const p of agreement.participants) {
+      if (p.userId && p.userId !== userId) {
+        this.notifications
+          .send(
+            p.userId,
+            'AGREEMENT_CANCELLED',
+            'Combinado cancelado',
+            `O combinado "${agreement.title}" foi cancelado.`,
+            { agreementId: id },
+          )
+          .catch(() => {});
+      }
+    }
+
     return this.findOne(userId, id);
   }
 
@@ -2008,6 +2171,20 @@ export class AgreementsService {
         },
       });
     });
+
+    for (const p of agreement.participants) {
+      if (p.userId && p.userId !== userId) {
+        this.notifications
+          .send(
+            p.userId,
+            'AGREEMENT_COMPLETED',
+            'Combinado concluído',
+            `O combinado "${agreement.title}" foi concluído.`,
+            { agreementId: id },
+          )
+          .catch(() => {});
+      }
+    }
 
     return this.findOne(userId, id);
   }

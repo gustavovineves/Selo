@@ -23,6 +23,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { AuditLogsService } from '../audit-logs/audit-logs.service';
 import { TrustScoreService } from '../trust-score/trust-score.service';
 import { BlockchainRecordsService } from '../blockchain-records/blockchain-records.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { AdminResolveReleaseDto } from './dto/admin-resolve-release.dto';
 import { AdminResolveRefundDto } from './dto/admin-resolve-refund.dto';
 import { AdminListDisputesDto } from './dto/admin-list-disputes.dto';
@@ -34,6 +35,7 @@ export class AdminService {
     private readonly auditLogs: AuditLogsService,
     private readonly trustScore: TrustScoreService,
     private readonly blockchainRecords: BlockchainRecordsService,
+    private readonly notifications: NotificationsService,
   ) {}
 
   async getStats() {
@@ -438,6 +440,30 @@ export class AdminService {
       resolvedAt: now.toISOString(),
     });
 
+    // Notifica os participantes com o resultado da contestação
+    if (agreement.receiverId) {
+      this.notifications
+        .send(
+          agreement.receiverId,
+          'PAYOUT_SENT',
+          'Contestação resolvida — valor liberado',
+          `A análise foi concluída. O valor do combinado foi liberado para você.`,
+          { agreementId: agreement.id },
+        )
+        .catch(() => {});
+    }
+    if (agreement.payerId) {
+      this.notifications
+        .send(
+          agreement.payerId,
+          'DISPUTE_RESOLVED',
+          'Contestação resolvida',
+          `A análise foi concluída. O valor foi liberado ao recebedor.`,
+          { agreementId: agreement.id },
+        )
+        .catch(() => {});
+    }
+
     return this.getDispute(disputeId);
   }
 
@@ -673,6 +699,30 @@ export class AdminService {
       currency: guarantee.currency,
       resolvedAt: now.toISOString(),
     });
+
+    // Notifica os participantes com o resultado da contestação
+    if (agreement.payerId) {
+      this.notifications
+        .send(
+          agreement.payerId,
+          'REFUND_PROCESSED',
+          'Contestação resolvida — reembolso registrado',
+          `A análise foi concluída. O valor do combinado será reembolsado para você.`,
+          { agreementId: agreement.id },
+        )
+        .catch(() => {});
+    }
+    if (agreement.receiverId) {
+      this.notifications
+        .send(
+          agreement.receiverId,
+          'DISPUTE_RESOLVED',
+          'Contestação resolvida',
+          `A análise foi concluída. O valor foi reembolsado ao pagador.`,
+          { agreementId: agreement.id },
+        )
+        .catch(() => {});
+    }
 
     return this.getDispute(disputeId);
   }

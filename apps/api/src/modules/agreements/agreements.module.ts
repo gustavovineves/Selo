@@ -6,6 +6,7 @@ import { TrustScoreModule } from '../trust-score/trust-score.module';
 import { BlockchainRecordsModule } from '../blockchain-records/blockchain-records.module';
 import { FinancialGuaranteesModule } from '../financial-guarantees/financial-guarantees.module';
 import { ReceivingDestinationsModule } from '../receiving-destinations/receiving-destinations.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
   imports: [
@@ -14,6 +15,7 @@ import { ReceivingDestinationsModule } from '../receiving-destinations/receiving
     BlockchainRecordsModule,
     FinancialGuaranteesModule,
     ReceivingDestinationsModule,
+    NotificationsModule,
   ],
   controllers: [AgreementsController],
   providers: [AgreementsService],
