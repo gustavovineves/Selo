@@ -35,9 +35,8 @@ export class CreateGuaranteedAgreementDto {
   @IsString()
   currency?: string;
 
-  @IsOptional()
   @IsDateString()
-  dueDate?: string;
+  dueDate: string;
 
   @IsOptional()
   @IsDateString()

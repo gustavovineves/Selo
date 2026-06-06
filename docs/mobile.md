@@ -234,7 +234,7 @@ O token JWT é armazenado via `expo-secure-store`. Para testes:
 1. **Quem** — input de chave + botão Confirmar → resolve via `GET /receiving-keys/resolve/:key`
 2. **Título + Descrição** — título obrigatório (3–100 chars), descrição opcional
 3. **Valor** — obrigatório para garantia, opcional com "Pular" para os demais
-4. **Prazo** — chips: Sem prazo / 7 dias / 30 dias / Personalizado (DD/MM/AAAA)
+4. **Prazo** — chips: 7 dias / 30 dias / Personalizado (DD/MM/AAAA) — **Sem prazo removido na Fase 18** (dueDate agora obrigatório)
 5. **Resumo** — frase em linguagem humana + detalhes + "Criar combinado"
 6. **Sucesso** — resumo do acordo criado, botões "Ver acordo" e "Voltar para início"
 
@@ -761,3 +761,50 @@ Criar uma central de notificações dentro do app para avisar o usuário sobre e
 | Badge não atualiza em segundo plano | Requer push notifications reais |
 | Paginação infinita na lista de notificações | Futuro |
 | Filtro por tipo na tela | Futuro |
+
+---
+
+## Fase 18 — Auditoria do Prazo Visual e Mudanças no Picker de Data
+
+### Estado atual (pós Fase 18)
+
+O fluxo de criação de acordos usa **chips de seleção rápida** para o prazo:
+
+- **7 dias** (padrão inicial)
+- **30 dias**
+- **Personalizado** — input de texto DD/MM/AAAA
+
+A opção "Sem prazo" foi **removida** na Fase 18, porque `dueDate` agora é obrigatório no backend (enforçado pelo DTO com `@IsDateString()` sem `@IsOptional()`).
+
+### O que permite hoje
+
+| Item | Status |
+|---|---|
+| Selecionar dia (via chip 7d/30d ou DD/MM/AAAA) | ✅ |
+| Horário específico | ⚠️ Não exposto ao usuário — backend usa 23:59:59 local para 7d/30d, ou o ISO passado pelo cliente |
+| Date Picker Wheel visual (dia/mês/ano) | ❌ Não implementado |
+| Infinite Scroll Picker para horário | ❌ Não implementado |
+
+### Pendência de UX (Polimento Futuro)
+
+O alvo de UX para seleção de prazo é:
+
+- **Date Picker Wheel** — scrollable wheel para dia / mês / ano (similar ao iOS DatePicker nativo)
+- **Infinite Scroll Picker** — scrollable para horário (hora e minuto)
+- Sem formulário longo — seleção visual, intuitiva, com feedback imediato
+
+**Isso NÃO foi implementado na Fase 18.** A prioridade desta fase foi a validação E2E com banco real. O polimento visual do picker fica para uma fase futura de UX.
+
+### Como o horário é tratado hoje
+
+- Chips `7 dias` / `30 dias`: a função `quickDate()` define horário `23:59:59` local
+- Campo personalizado DD/MM/AAAA: também usa `23:59:59` local (via `parseDateInput()`)
+- O backend armazena e preserva o ISO completo com hora — já testado nos E2E da Fase 18
+
+### Impacto nos testes E2E
+
+Os testes E2E (Fase 18) validam que:
+- `dueDate` é obrigatório (DTO bloqueado sem dueDate)
+- Dia e horário são preservados no banco (comparando `getUTCHours()` e `getUTCMinutes()` before/after)
+- `receiverKeySnapshot.userId` correto preservado
+- `receiverDestinationSnapshot` preservado nos acordos com garantia

@@ -1,6 +1,6 @@
 # Progresso do Projeto Selo
 
-Última atualização: 2026-06-06 (Fase 17 — Auth Admin Real com AdminUser + JWT)
+Última atualização: 2026-06-06 (Fase 18 — Testes E2E com PostgreSQL Real)
 
 ---
 
@@ -46,6 +46,7 @@
 | Painel Admin Web — Operação de Disputas | ✅ Implementado (Fase 15) |
 | Testes Automatizados do MVP (142 testes unitários) | ✅ Implementado (Fase 16) |
 | Auth Admin Real (AdminUser + JWT separado, 155 testes) | ✅ Implementado (Fase 17) |
+| Testes E2E com PostgreSQL Real (83 testes E2E, 238 total) | ✅ Implementado (Fase 18) |
 | Score de Confiança | ✅ recordEvent implementado (Fase 5 e 6) |
 | Git local | ✅ Limpo após commit da Fase 4 |
 
@@ -993,9 +994,80 @@ Tokens admin são rejeitados em rotas de usuário (secret diferente, falha na as
 
 ---
 
+## 5m. Fase 18 — Testes E2E com PostgreSQL Real (Implementada)
+
+### Objetivo
+
+Provar que o fluxo completo do MVP funciona de ponta a ponta com banco de dados real. Os testes E2E cobrem todos os fluxos críticos: cadastro, chaves, acordos simples, acordos com garantia, pagamento simulado, contestação formal e resolução administrativa.
+
+### O que foi implementado
+
+- `apps/api/jest-e2e.json` — configuração Jest para testes E2E
+- `apps/api/package.json` — script `test:e2e`
+- `apps/api/test/e2e/global-setup.ts` — limpeza de dados de teste antes da suíte
+- `apps/api/test/e2e/global-teardown.ts` — limpeza de dados de teste após a suíte
+- `apps/api/test/e2e/mvp-flow.e2e-spec.ts` — 83 testes E2E com PostgreSQL real
+
+### Fluxos cobertos (83 testes)
+
+| Bloco | Testes |
+|---|---|
+| Cadastro e Autenticação | 8 |
+| Chave de Recebimento do App | 9 |
+| Destino de Recebimento | 5 |
+| Validação dueDate obrigatório (via class-validator) | 3 |
+| Acordo Simples completo | 7 |
+| Acordo com Garantia (Dupla Confirmação) | 10 |
+| Contestação + Resolução Admin (Release) | 12 |
+| Resolução Admin (Reembolso) | 7 |
+| Notificações In-App | 9 |
+| Wallet Summary | 4 |
+| Admin — Listagem e Detalhe | 5 |
+| **Total** | **83** |
+
+### Mudanças de comportamento
+
+- `dueDate` agora é **obrigatório** em `CreateSimpleAgreementDto` e `CreateGuaranteedAgreementDto`
+- Mobile: opção "Sem prazo" removida do picker de datas; prazo padrão inicial = 7 dias
+- Mobile: validação de prazo no step 3 agora exige que uma opção seja selecionada
+
+### Banco de dados de teste
+
+- Usa o mesmo banco `selodb` (PostgreSQL porta 5434) com dados de usuário prefixados `e2e-*`
+- Limpeza automática antes/depois de cada execução
+- Não cria banco separado, não roda migration nova
+
+### Resultados
+
+| Suíte | Resultado |
+|---|---|
+| `pnpm --filter @selo/api test` | ✅ **155 testes, 10 suítes, 0 falhas** |
+| `pnpm --filter @selo/api test:e2e` | ✅ **83 testes, 1 suíte, 0 falhas** |
+| `pnpm --filter @selo/api build` | ✅ Exit 0 |
+| `pnpm --filter @selo/mobile typecheck` | ✅ Exit 0 |
+| `pnpm --filter @selo/admin typecheck` | ✅ Exit 0 |
+
+### Confirmações Obrigatórias
+
+| Restrição | Status |
+|---|---|
+| Schema Prisma alterado? | **Não** |
+| Migration nova rodada? | **Não** |
+| Fitbank real? | **Não** |
+| Pix real? | **Não** |
+| Blockchain real? | **Não** |
+| KYC? | **Não** |
+| Push notifications reais? | **Não** |
+| Chat? | **Não** |
+| Regra financeira alterada? | **Não** |
+| Dinheiro real movimentado? | **Não** |
+| Commit feito? | **Não** |
+
+---
+
 ## 7. Próxima Fase
 
-Fase 18 sugerida: Testes E2E com banco PostgreSQL real, upload de avatar no mobile, push notifications reais (Expo Notifications) ou integração Fitbank.
+Fase 19 sugerida: upload de avatar no mobile, push notifications reais (Expo Notifications), integração Fitbank, ou CI automatizado (GitHub Actions para rodar unitários + E2E).
 
 Não implementar sem instrução explícita: Fitbank real, blockchain real, KYC, push notifications reais.
 

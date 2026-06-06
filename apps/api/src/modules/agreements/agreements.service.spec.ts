@@ -76,6 +76,7 @@ describe('AgreementsService', () => {
     const dto = {
       title: 'Acordo simples',
       counterpartyKey: '@bob',
+      dueDate: '2027-12-31T23:59:59.000Z',
     };
 
     it('cria acordo simples e retorna com participantes e eventos', async () => {
@@ -122,6 +123,7 @@ describe('AgreementsService', () => {
       counterpartyKey: '@bob',
       amount: 350,
       currency: 'BRL',
+      dueDate: '2027-12-31T23:59:59.000Z',
     };
 
     it('lança BadRequestException quando recebedor não tem destino ativo', async () => {

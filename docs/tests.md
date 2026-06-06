@@ -1,18 +1,21 @@
-# Testes Automatizados — Selo API (Fase 17)
+# Testes Automatizados — Selo API (Fase 18)
 
 ## Objetivo
 
-Proteger o núcleo do MVP contra regressões com uma base inicial de testes unitários automáticos.
+Proteger o núcleo do MVP com testes unitários automatizados (Fase 16/17) e provar que o fluxo completo do MVP funciona de ponta a ponta com banco de dados real (Fase 18 — testes E2E com PostgreSQL local).
 
-Esta fase não adicionou funcionalidade financeira real, não alterou regras de negócio, não alterou o banco de dados e não movimentou dinheiro real. O objetivo exclusivo foi segurança técnica por cobertura de testes.
+Esta fase não implementou Fitbank real, Pix real, blockchain real, KYC, chat, push notifications reais, alterações de regras financeiras, migration nova ou commit.
 
 ---
 
 ## Como Rodar
 
 ```bash
-# Testes unitários do backend
+# Testes unitários do backend (155 testes, ~10s, sem banco real)
 pnpm --filter @selo/api test
+
+# Testes E2E com banco PostgreSQL real (83 testes, ~6s, requer Docker rodando)
+pnpm --filter @selo/api test:e2e
 
 # Testes com cobertura
 pnpm --filter @selo/api test:cov
@@ -28,18 +31,36 @@ pnpm --filter @selo/admin typecheck
 pnpm --filter @selo/api build
 ```
 
+### Pré-requisitos para E2E
+
+1. Docker rodando: `pnpm docker:up`
+2. PostgreSQL acessível em `127.0.0.1:5434` (configuração padrão)
+3. `apps/api/.env` com `DATABASE_URL` correto
+4. Migrations aplicadas: `pnpm db:migrate` (feito uma única vez no início do projeto)
+
 ---
 
 ## Estratégia
 
-### Tipo de testes: Unit Tests com Mock de Prisma
+### Testes Unitários (Fase 16/17) — Mock do Prisma
 
 Os testes unitários usam mocks do `PrismaService` via `jest.fn()` em vez de um banco real. Isso garante:
 
-- **Velocidade**: toda a suíte roda em ~7 segundos
+- **Velocidade**: toda a suíte roda em ~10 segundos
 - **Isolamento**: cada teste controla exatamente o que o banco "responde"
 - **Sem efeito colateral**: nenhuma migration, nenhum dado real criado
 - **Compatibilidade**: usa Jest + ts-jest conforme já configurado no `package.json` do `apps/api`
+
+### Testes E2E (Fase 18) — PostgreSQL Real
+
+Os testes E2E usam `@nestjs/testing` com o `AppModule` completo conectado ao PostgreSQL real (Docker local, porta 5434). Isso prova que:
+
+- **Fluxos reais funcionam**: cadastro → chave → acordo → pagamento simulado → disputa → admin resolve
+- **Integridade do banco**: constraints, cascade deletes, unique keys funcionam conforme o schema
+- **Limpeza automática**: `globalSetup` e `globalTeardown` removem dados de teste antes/depois da suíte
+- **Zero efeito externo**: sem Fitbank real, Pix real, blockchain real ou dinheiro real movimentado
+
+Dados de teste usam o domínio `@e2e-test.local` e handles `@e2e-*` para evitar conflito com dados reais.
 
 ### Framework
 
@@ -48,52 +69,92 @@ Os testes unitários usam mocks do `PrismaService` via `jest.fn()` em vez de um 
 | Jest | 29.x | Runner de testes |
 | ts-jest | 29.x | Compilação TypeScript no teste |
 | @nestjs/testing | 10.x | `Test.createTestingModule()` |
+| @prisma/client | 5.x | Conexão real ao banco nos E2E |
+| class-validator | 0.14.x | Validação de DTOs nos E2E |
 
 ### Estrutura
 
 ```
-apps/api/src/
+apps/api/
+├── jest-e2e.json                         ← Config Jest para E2E (Fase 18)
 ├── test/
+│   ├── e2e/
+│   │   ├── global-setup.ts               ← Limpeza de dados de teste antes da suíte
+│   │   ├── global-teardown.ts            ← Limpeza de dados de teste após a suíte
+│   │   └── mvp-flow.e2e-spec.ts          ← 83 testes E2E com PostgreSQL real (Fase 18)
 │   └── helpers/
-│       └── factories.ts          ← Factories de dados de teste + mock do Prisma (incl. makeAdminUser)
-├── modules/
-│   ├── admin/
-│   │   ├── admin-auth.service.spec.ts  ← Fase 17: login, getMe, logout admin
-│   │   └── admin.service.spec.ts
-│   ├── auth/
-│   │   └── auth.service.spec.ts
-│   ├── receiving-keys/
-│   │   └── receiving-keys.service.spec.ts
-│   ├── receiving-destinations/
-│   │   └── receiving-destinations.service.spec.ts
-│   ├── agreements/
-│   │   └── agreements.service.spec.ts
-│   ├── payments/
-│   │   └── payments.service.spec.ts
-│   ├── disputes/
-│   │   └── disputes.service.spec.ts
-│   ├── admin/
-│   │   └── admin.service.spec.ts
-│   ├── notifications/
-│   │   └── notifications.service.spec.ts
-│   └── trust-score/
-│       └── trust-score.service.spec.ts
+│       └── factories.ts                  ← Factories + mock do Prisma + makeAdminUser
+└── src/
+    └── modules/
+        ├── admin/
+        │   ├── admin-auth.service.spec.ts   ← Fase 17: auth admin JWT
+        │   └── admin.service.spec.ts
+        ├── auth/
+        │   └── auth.service.spec.ts
+        ├── receiving-keys/
+        │   └── receiving-keys.service.spec.ts
+        ├── receiving-destinations/
+        │   └── receiving-destinations.service.spec.ts
+        ├── agreements/
+        │   └── agreements.service.spec.ts
+        ├── payments/
+        │   └── payments.service.spec.ts
+        ├── disputes/
+        │   └── disputes.service.spec.ts
+        ├── notifications/
+        │   └── notifications.service.spec.ts
+        └── trust-score/
+            └── trust-score.service.spec.ts
 ```
 
 ---
 
-## Resultado da Suíte
+## Resultado das Suítes
+
+### Unitários (pnpm --filter @selo/api test)
 
 ```
 Test Suites: 10 passed, 10 total
 Tests:       155 passed, 155 total
 Snapshots:   0 total
-Time:        ~15s
+Time:        ~10s
 ```
+
+### E2E com PostgreSQL Real (pnpm --filter @selo/api test:e2e)
+
+```
+Test Suites: 1 passed, 1 total
+Tests:       83 passed, 83 total
+Snapshots:   0 total
+Time:        ~6s
+```
+
+**Total combinado: 238 testes automatizados (155 unitários + 83 E2E), 0 falhas.**
 
 ---
 
 ## Cobertura por Módulo
+
+### Testes E2E com PostgreSQL Real (83 testes) — Fase 18
+
+| Bloco | Cenários cobertos | Testes |
+|---|---|---|
+| Cadastro e Autenticação | register A/B/C, login, getMe, duplicidade, senha errada | 8 |
+| Chave de Recebimento | create A/B/C, findActive, resolve, duplicidade, inexistente | 9 |
+| Destino de Recebimento | create B, findAll, findAnyActive, ausência em C, bloqueia acordo sem destino | 5 |
+| Validação dueDate (HTTP) | DTO simples sem dueDate, garantia sem dueDate, com dueDate válido | 3 |
+| Acordo Simples | criar com dueDate+hora, aceitar, completar, eventos, notificação | 7 |
+| Acordo com Garantia (Dupla Confirmação) | criar, aceitar, pagar, simular confirmação, 2x confirmar, PAID_OUT, payout, trust score | 10 |
+| Contestação + Admin Release | criar disputa, FROZEN, bloqueios, login admin, token security, resolveRelease, PAID_OUT, audit log, dup resolve | 12 |
+| Admin Reembolso | novo fluxo, disputa, resolveRefund, REFUNDED, refund criado, audit log | 7 |
+| Notificações | A e B têm notifs, AGREEMENT_RECEIVED, FUNDS_LOCKED, markAllRead, isolamento | 9 |
+| Wallet Summary | getWalletSummary A/B, totals.completed ≥ 2, getStats | 4 |
+| Admin Listagem | listDisputes, filtro RESOLVED, getDispute, NotFoundException, mensagem genérica | 5 |
+| **Total** | | **83** |
+
+**Dados de teste:** usuários `e2e-alice`, `e2e-bob`, `e2e-carol` no domínio `@e2e-test.local`, handles `@e2e-*-test`.
+
+---
 
 ### Auth Admin — AdminAuthService (13 testes) — Fase 17
 

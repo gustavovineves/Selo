@@ -159,7 +159,7 @@ export default function CreateAgreementScreen() {
   const [amountStr, setAmountStr] = useState('');
 
   // Step 3 — due date
-  const [dateMode, setDateMode] = useState<'none' | '7' | '30' | 'custom'>('none');
+  const [dateMode, setDateMode] = useState<'7' | '30' | 'custom'>('7');
   const [customDateInput, setCustomDateInput] = useState('');
   const [dateIso, setDateIso] = useState<string | undefined>(undefined);
 
@@ -252,6 +252,11 @@ export default function CreateAgreementScreen() {
         }
         setDateIso(parsed);
       }
+      const finalDate = dateMode === 'custom' ? dateIso : quickDate(parseInt(dateMode));
+      if (!finalDate) {
+        setStepError('Informe o prazo do combinado.');
+        return;
+      }
     }
 
     if (step === TOTAL_STEPS - 1) {
@@ -270,7 +275,6 @@ export default function CreateAgreementScreen() {
     const amount = !isNaN(amtNum) && amtNum > 0 ? amtNum : undefined;
 
     const finalDueDate = (() => {
-      if (dateMode === 'none') return undefined;
       if (dateMode === '7') return quickDate(7);
       if (dateMode === '30') return quickDate(30);
       return dateIso;
@@ -325,7 +329,6 @@ export default function CreateAgreementScreen() {
 
   const isLastStep = step === TOTAL_STEPS - 1;
   const finalDueIso = (() => {
-    if (dateMode === 'none') return undefined;
     if (dateMode === '7') return quickDate(7);
     if (dateMode === '30') return quickDate(30);
     return dateIso;
@@ -408,7 +411,7 @@ export default function CreateAgreementScreen() {
           {step === 3 && (
             <StepDate
               dateMode={dateMode}
-              onDateModeChange={(mode) => {
+              onDateModeChange={(mode: '7' | '30' | 'custom') => {
                 setDateMode(mode);
                 if (mode !== 'custom') setCustomDateInput('');
               }}
@@ -622,7 +625,6 @@ function StepAmount({
 }
 
 const DATE_OPTIONS = [
-  { label: 'Sem prazo', mode: 'none' as const },
   { label: '7 dias', mode: '7' as const },
   { label: '30 dias', mode: '30' as const },
   { label: 'Personalizado', mode: 'custom' as const },
@@ -634,15 +636,15 @@ function StepDate({
   customDateInput,
   onCustomDateChange,
 }: {
-  dateMode: 'none' | '7' | '30' | 'custom';
-  onDateModeChange: (mode: 'none' | '7' | '30' | 'custom') => void;
+  dateMode: '7' | '30' | 'custom';
+  onDateModeChange: (mode: '7' | '30' | 'custom') => void;
   customDateInput: string;
   onCustomDateChange: (v: string) => void;
 }) {
   return (
     <View>
-      <Text style={styles.label}>Prazo do combinado</Text>
-      <Text style={styles.hint}>Quando o combinado precisa ser cumprido?</Text>
+      <Text style={styles.label}>Prazo do combinado *</Text>
+      <Text style={styles.hint}>Todo combinado precisa ter prazo. Escolha uma opção ou defina uma data personalizada.</Text>
 
       <View style={styles.dateChips}>
         {DATE_OPTIONS.map((opt) => (
@@ -673,7 +675,7 @@ function StepDate({
         </View>
       )}
 
-      {dateMode !== 'none' && dateMode !== 'custom' && (
+      {dateMode !== 'custom' && (
         <View style={styles.datePrev}>
           <Ionicons name="calendar-outline" size={16} color={Colors.textSecondary} />
           <Text style={styles.datePrevText}>
