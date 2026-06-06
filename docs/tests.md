@@ -1,10 +1,10 @@
-# Testes Automatizados — Selo API (Fase 18/19)
+# Testes Automatizados — Selo API (Fase 18/19/20)
 
 ## Objetivo
 
 Proteger o núcleo do MVP com testes unitários automatizados (Fase 16/17) e provar que o fluxo completo do MVP funciona de ponta a ponta com banco de dados real (Fase 18 — testes E2E com PostgreSQL local).
 
-Fase 18 implementou os testes E2E. Fase 19 (polimento UX do prazo mobile) não alterou nenhum teste — os 238 testes continuam passando sem modificação.
+Fase 18 implementou os testes E2E. Fase 19 (polimento UX do prazo mobile) não alterou nenhum teste. Fase 20 (auditoria final) corrigiu o bug de formatação de dueDate na tela de detalhe do mobile — nenhum teste foi alterado. Os 238 testes continuam passando sem modificação.
 
 ---
 

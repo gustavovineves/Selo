@@ -170,7 +170,7 @@ Cria um Acordo Simples.
 | `description` | string (máx 2000) | Não | Observação adicional |
 | `amount` | number | Não | Valor apenas registrado (sem bloqueio) |
 | `currency` | string | Não | Moeda, default `BRL` |
-| `dueDate` | ISO8601 | Não | Prazo do acordo |
+| `dueDate` | ISO8601 | **Sim** | Prazo do acordo (obrigatório desde a Fase 18) |
 | `acceptanceExpiresAt` | ISO8601 | Não | Prazo para aceite |
 | `confirmationRule` | enum | Não | `MANUAL` ou `SINGLE_PARTY` (default) |
 

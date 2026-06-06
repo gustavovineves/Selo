@@ -122,7 +122,7 @@ apps/admin/
 │   │   ├── Modal.tsx               # Modal de confirmação reutilizável
 │   │   └── StatusBadge.tsx         # Badge de status com cores semânticas
 │   └── lib/
-│       ├── api.ts                  # Cliente HTTP com X-Admin-Token
+│       ├── api.ts                  # Cliente HTTP com JWT admin (Authorization: Bearer)
 │       └── types.ts                # Tipos TypeScript alinhados com o backend
 ├── .env.example                    # Variáveis de ambiente necessárias
 ├── next.config.ts                  # Configuração Next.js
@@ -136,11 +136,11 @@ apps/admin/
 
 ### `/login`
 
-- Formulário com campo de token (password mascarado)
-- Botão para exibir/ocultar token
-- Valida o token chamando `GET /api/v1/admin/health`
-- Redireciona para `/dashboard` se válido
-- Exibe nota sobre autenticação provisória
+- Formulário com campos de **email** e **senha** (`AdminUser`)
+- Botão para exibir/ocultar senha
+- Chama `POST /api/v1/admin/auth/login`; salva JWT admin em `localStorage`
+- Redireciona para `/dashboard` se autenticado com sucesso
+- Exibe nota indicando que o acesso exige `AdminUser` cadastrado no banco
 
 ### `/dashboard`
 
@@ -188,14 +188,14 @@ Detalhe completo organizado em 6 blocos:
 | POST | `/api/v1/admin/disputes/:id/resolve-release` | Modal "Liberar ao recebedor" |
 | POST | `/api/v1/admin/disputes/:id/resolve-refund` | Modal "Reembolsar pagador" |
 
-Todos os endpoints enviam `X-Admin-Token: <token>` no header.
+Todos os endpoints enviam `Authorization: Bearer <accessToken>` no header (JWT admin obtido no login).
 
 ---
 
 ## Fluxo de Resolução Humana
 
 ```
-Admin acessa /login → informa ADMIN_TOKEN → validado
+Admin acessa /login → informa email + senha → JWT admin obtido
   ↓
 /dashboard → vê contestações abertas → clica "Ver contestações"
   ↓

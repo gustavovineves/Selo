@@ -161,9 +161,9 @@ Adiciona mensagem à disputa.
 
 ## Endpoints Administrativos (Fase 6)
 
-**Auth:** Header `X-Admin-Token: <ADMIN_TOKEN>` (env)
+**Auth:** Header `Authorization: Bearer <accessToken>` (JWT admin obtido em `POST /admin/auth/login`)
 
-> No MVP, autenticação é por token estático. Produção usará `AdminUser` com JWT separado.
+> Desde a Fase 17, a autenticação do painel admin usa `AdminUser` com JWT separado do JWT de usuário comum.
 
 ---
 

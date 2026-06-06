@@ -92,15 +92,28 @@ pnpm dev:mobile
 
 ---
 
-## Fases do Produto
+## Fases do MVP Simulado (Implementadas)
 
 | Fase | Status | Descrição |
 |------|--------|-----------|
-| Fase 1 | Em andamento | Base: Auth, Usuários, Acordos simples |
-| Fase 2 | Planejado | Garantias e Pix real |
-| Fase 3 | Planejado | Score e Disputas |
-| Fase 4 | Planejado | Blockchain e Admin |
-| Fase 5 | Planejado | BaaS / Fitbank |
+| Fases 1–8 | ✅ Concluído | Base, Auth, Chave, Acordos Simples e com Garantia, Pix Simulado, Disputas, Resolução Admin, Destino de Recebimento |
+| Fases 9–14 | ✅ Concluído | App Mobile: criação, detalhe, Pix simulado, contestação, perfil, chave, destino, refresh JWT, notificações in-app |
+| Fase 15 | ✅ Concluído | Painel Admin Web (Next.js) — operação humana de disputas |
+| Fases 16–17 | ✅ Concluído | Testes unitários (155), Auth Admin real (AdminUser + JWT separado) |
+| Fase 18 | ✅ Concluído | Testes E2E com PostgreSQL real (83 testes, 238 total) |
+| Fase 19 | ✅ Concluído | Polimento UX Mobile: Date Picker + Time Wheel para prazo |
+| Fase 20 | ✅ Concluído | Auditoria final do MVP simulado |
+
+## Próximas Etapas (não implementadas)
+
+| Fase | Descrição |
+|------|-----------|
+| Fase 21 | CI/GitHub Actions |
+| Fase 22 | Ambientes e Segurança |
+| Fase 23 | Fitbank Sandbox / Pix Sandbox |
+| Fase 24 | KYC Progressivo |
+| Fase 25 | Blockchain Testnet como Prova |
+| Fase 26 | UX Final e Beta Fechado |
 
 ---
 

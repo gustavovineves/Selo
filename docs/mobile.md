@@ -897,3 +897,15 @@ Afeta:
 | dueDate removido/tornado opcional? | **Não — continua obrigatório** |
 | Dinheiro real movimentado? | **Não** |
 | Commit feito? | **Não** |
+
+---
+
+## Fase 20 — Auditoria Final do MVP Simulado (Concluída)
+
+### Bug corrigido nesta fase
+
+| Arquivo | Bug | Correção |
+|---|---|---|
+| `apps/mobile/app/agreement/[id].tsx` | Linha 681: `formatDate(agreement.dueDate)` exibia apenas `"25/06/2026"` sem o horário | Adicionada `formatDateWithTime` — exibe `"25/06/2026 às 18:00"` |
+
+O campo "Prazo" na tela de detalhe do acordo agora é coerente com o resumo do wizard de criação e com a tela de sucesso (que já exibiam data + hora desde a Fase 19).

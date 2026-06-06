@@ -48,6 +48,14 @@ function formatDate(iso: string | null | undefined): string {
   return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
 }
 
+function formatDateWithTime(iso: string | null | undefined): string {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  const date = `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
+  const time = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+  return `${date} às ${time}`;
+}
+
 function formatCurrency(amount: number | string | null | undefined, currency = 'BRL'): string {
   if (amount === null || amount === undefined) return '—';
   const num = typeof amount === 'string' ? parseFloat(amount) : amount;
@@ -678,7 +686,7 @@ export default function AgreementDetailScreen() {
         {/* ── 10. Details ── */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Detalhes</Text>
-          <DetailRow label="Prazo" value={formatDate(agreement.dueDate)} />
+          <DetailRow label="Prazo" value={formatDateWithTime(agreement.dueDate)} />
           <DetailRow label="Criado em" value={formatDate(agreement.createdAt)} />
           {agreement.description ? (
             <DetailRow label="Observação" value={agreement.description} />

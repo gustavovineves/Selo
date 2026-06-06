@@ -155,7 +155,7 @@ Cria um Acordo com Garantia.
 | `amount` | number | Sim | Valor da garantia (min 0.01) |
 | `currency` | string | Não | Default `BRL` |
 | `description` | string (máx 2000) | Não | Descrição |
-| `dueDate` | ISO8601 | Não | Prazo do acordo |
+| `dueDate` | ISO8601 | **Sim** | Prazo do acordo (obrigatório desde a Fase 18) |
 | `acceptanceExpiresAt` | ISO8601 | Não | Prazo para aceite |
 | `confirmationDeadlineAt` | ISO8601 | Não | Prazo para confirmação |
 | `confirmationRule` | enum | Não | **MANUAL (default — dupla confirmação obrigatória)** |

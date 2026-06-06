@@ -1,6 +1,6 @@
 # Progresso do Projeto Selo
 
-Última atualização: 2026-06-06 (Fase 19 — Polimento UX Mobile de Prazo)
+Última atualização: 2026-06-06 (Fase 20 — Auditoria Final do MVP Simulado)
 
 ---
 
@@ -48,6 +48,7 @@
 | Auth Admin Real (AdminUser + JWT separado, 155 testes) | ✅ Implementado (Fase 17) |
 | Testes E2E com PostgreSQL Real (83 testes E2E, 238 total) | ✅ Implementado (Fase 18) |
 | Polimento UX Mobile de Prazo (Date Picker + Time Wheel) | ✅ Implementado (Fase 19) |
+| Auditoria Final do MVP Simulado | ✅ Implementado (Fase 20) |
 | Score de Confiança | ✅ recordEvent implementado (Fase 5 e 6) |
 | Git local | ✅ Limpo após commit da Fase 4 |
 
@@ -1132,9 +1133,116 @@ Melhorar a etapa de prazo no wizard de criação de acordos: substituir o input 
 
 ---
 
+## 5o. Fase 20 — Auditoria Final do MVP Simulado (Implementada)
+
+### Objetivo
+
+Auditoria ponta a ponta do MVP simulado antes de avançar para CI, Fitbank sandbox, Pix real, KYC ou blockchain testnet. Sem novas features — apenas revisão de inconsistências, correção de bugs pequenos, padronização de mensagens e atualização de documentação.
+
+### Estado do repositório
+
+- Branch atual: `dev`
+- Git status: limpo (sem alterações não rastreadas)
+- Arquivos `.env` rastreados: apenas `.env.example` — sem segredos reais versionados
+
+### Bugs corrigidos
+
+| Arquivo | Bug | Correção |
+|---|---|---|
+| `apps/mobile/app/agreement/[id].tsx` | `dueDate` exibido apenas como data (`25/06/2026`) sem o horário | Adicionada função `formatDateWithTime` que exibe `"25/06/2026 às 18:00"` |
+
+### Inconsistências de documentação corrigidas
+
+| Arquivo | Inconsistência | Correção |
+|---|---|---|
+| `docs/admin.md` | Seção `/login` descrevia autenticação antiga por token estático | Atualizada para email + senha + JWT admin (Fase 17) |
+| `docs/admin.md` | `api.ts # Cliente HTTP com X-Admin-Token` | Atualizado para "JWT admin (Authorization: Bearer)" |
+| `docs/admin.md` | "Todos os endpoints enviam X-Admin-Token" | Atualizado para "Authorization: Bearer" |
+| `docs/admin.md` | Fluxo de Resolução Humana: "informa ADMIN_TOKEN" | Atualizado para "informa email + senha" |
+| `docs/disputes.md` | Auth admin: `X-Admin-Token` + nota "autenticação por token estático" | Atualizado para JWT admin (Fase 17) |
+| `docs/agreements.md` | `dueDate` marcado como opcional ("Não") | Corrigido para obrigatório ("Sim") desde Fase 18 |
+| `docs/guaranteed-agreements.md` | `dueDate` marcado como opcional ("Não") | Corrigido para obrigatório ("Sim") desde Fase 18 |
+| `README.md` | Tabela de fases com visão CLAUDE.md (5 fases planejadas) | Substituída por estado real do MVP (Fases 1–20 concluídas + próximas) |
+
+### Auditoria de segurança
+
+| Item | Status |
+|---|---|
+| `.env` real versionado? | **Não** — apenas `.env.example` com valores fake |
+| Segredo hardcoded no código? | **Não** — todos via `@nestjs/config` / `process.env` |
+| `passwordHash` exposto em endpoint? | **Não** |
+| Erro de login admin revela informação? | **Não** — mensagem genérica "Credenciais inválidas" |
+| JWT admin separado do JWT de usuário? | **Sim** — secrets diferentes, payload `type: "admin"` |
+| Usuário comum acessa rotas admin? | **Não** — `AdminJwtGuard` rejeita tokens de usuário |
+| Admin acessa rotas de usuário? | **Não** — `JwtAuthGuard` rejeita tokens admin (secret diferente) |
+
+### Auditoria de linguagem de produto (mobile + admin)
+
+| Checagem | Status |
+|---|---|
+| Termos técnicos (escrow, blockchain, hash) na UI do usuário? | **Não encontrado** |
+| Linguagem humana em contestação ("contestar", "valor protegido")? | **Sim** |
+| "Pagar com Pix" em vez de "payment-intents"? | **Sim** |
+| "Confirmar conclusão" em vez de "release"? | **Sim** |
+| Evidência tratada como registro formal, não chat? | **Sim** |
+
+### Auditoria do prazo obrigatório
+
+| Item | Status |
+|---|---|
+| `dueDate` obrigatório no DTO backend? | **Sim** — `@IsDateString()` sem `@IsOptional()` em ambos os DTOs |
+| Acordo simples sem prazo falha? | **Sim** — validado nos testes E2E |
+| Acordo com garantia sem prazo falha? | **Sim** — validado nos testes E2E |
+| Mobile exige data e horário? | **Sim** — DueDatePicker com validação no step 3 |
+| Mobile mostra prazo com hora no resumo? | **Sim** — `"Prazo: 25/06/2026 às 18:00"` |
+| Mobile mostra prazo com hora no detalhe? | **Sim** — corrigido nesta fase |
+| Prazo usa 23:59:59 automático escondido? | **Não** — usuário escolhe hora explicitamente |
+
+### Resultados de validação
+
+| Comando | Resultado |
+|---|---|
+| `pnpm --filter @selo/mobile typecheck` | ✅ Exit 0 |
+| `pnpm --filter @selo/api test` | ✅ **155 testes, 10 suítes, 0 falhas** |
+| `pnpm --filter @selo/api test:e2e` | ✅ **83 testes, 1 suíte, 0 falhas** |
+| `pnpm --filter @selo/api build` | ✅ Exit 0 |
+| `pnpm --filter @selo/admin typecheck` | ✅ Exit 0 |
+
+### Confirmações obrigatórias
+
+| Restrição | Status |
+|---|---|
+| Schema Prisma alterado? | **Não** |
+| Migration rodada? | **Não** |
+| Fitbank real integrado? | **Não** |
+| Pix real implementado? | **Não** |
+| Webhook Pix real? | **Não** |
+| Payout real? | **Não** |
+| Refund real? | **Não** |
+| Blockchain real? | **Não** |
+| KYC? | **Não** |
+| Chat? | **Não** |
+| Push notifications reais? | **Não** |
+| Regra financeira alterada? | **Não** |
+| dueDate continua obrigatório? | **Sim** |
+| Chave de Recebimento continua interna do app? | **Sim** |
+| Disputa continua formal e sem chat? | **Sim** |
+| Resolução continua humana/admin? | **Sim** |
+| Dinheiro real movimentado? | **Não** |
+| Commit feito? | **Não** |
+
+---
+
 ## 7. Próxima Fase
 
-Fase 20 sugerida: upload de avatar no mobile, push notifications reais (Expo Notifications), integração Fitbank, CI automatizado (GitHub Actions), ou seleção de horário por teclado no time picker.
+Fases sugeridas após a Auditoria Final (Fase 20), em ordem de prioridade:
+
+- **Fase 21** — CI/GitHub Actions: `pnpm --filter @selo/api test` em cada PR
+- **Fase 22** — Ambientes e Segurança: staging isolado, variáveis por ambiente, secrets management
+- **Fase 23** — Fitbank Sandbox / Pix Sandbox: substituição do `simulate-confirmation` por webhook real
+- **Fase 24** — KYC Progressivo: onboarding financeiro com CPF e validação do Banco Central
+- **Fase 25** — Blockchain Testnet: registro de hash de acordos em Ethereum/Polygon testnet
+- **Fase 26** — UX Final e Beta Fechado: animações, upload de avatar, polish geral
 
 Não implementar sem instrução explícita: Fitbank real, blockchain real, KYC, push notifications reais.
 
