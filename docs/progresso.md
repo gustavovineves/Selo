@@ -1,6 +1,6 @@
 # Progresso do Projeto Selo
 
-Última atualização: 2026-06-06 (Fase 12 — Perfil, Chave de Recebimento e Destino de Recebimento no Mobile)
+Última atualização: 2026-06-06 (Fase 13 — Infraestrutura Mobile de Sessão, Refresh JWT e Tratamento Global de Erros)
 
 ---
 
@@ -41,6 +41,7 @@
 | App Mobile (criação de acordos + detalhe) | ✅ Implementado (Fase 10) |
 | App Mobile (Pix simulado + contestação formal) | ✅ Implementado (Fase 11) |
 | App Mobile (Perfil, Chave, Destino de Recebimento) | ✅ Implementado (Fase 12) |
+| App Mobile (Refresh JWT, Interceptor 401, Erros Globais) | ✅ Implementado (Fase 13) |
 | Score de Confiança | ✅ recordEvent implementado (Fase 5 e 6) |
 | Git local | ✅ Limpo após commit da Fase 4 |
 
@@ -654,24 +655,70 @@ Os módulos abaixo existem como stubs (`NotImplementedException`) ou aguardam as
 | Painel Admin funcional (Next.js) | Fase 13 | `apps/admin` |
 | Notificações push | Fase 13 | `notifications` |
 | Auth admin real (AdminUser + JWT) | Fase 13 | `admin` |
-| Reembolso pelo app mobile (botão refund) | Fase 13 | `apps/mobile` |
-| Refresh automático do JWT (401 → refresh) | Fase 13 | `apps/mobile` |
-| Upload de arquivo como evidência de contestação | Fase 13 | `apps/mobile` |
-| Upload de avatar | Fase 13 | `apps/mobile` |
+| Reembolso pelo app mobile (botão refund) | Fase 14 | `apps/mobile` |
+| Upload de arquivo como evidência de contestação | Fase 14 | `apps/mobile` |
+| Upload de avatar | Fase 14 | `apps/mobile` |
+| Notificações push (Expo Notifications) | Fase 14 | `apps/mobile` |
+
+---
+
+## 5i. Fase 13 — Infraestrutura Mobile de Sessão, Refresh JWT e Tratamento Global de Erros (Implementada)
+
+### O que foi implementado
+
+- **Refresh automático de JWT**: interceptor no `api.ts` detecta 401, tenta `POST /auth/refresh`, salva novo token e repete a requisição original — transparente para o usuário
+- **Proteção contra múltiplos refresh simultâneos**: `refreshInFlight` (Promise compartilhada) garante que múltiplas requisições com 401 simultâneas disparam apenas um refresh
+- **Proteção contra loop infinito**: `isAuthPath()` impede que rotas de autenticação disparem novo refresh
+- **Logout automático com Alert**: quando refresh falha definitivamente, tokens são limpos e `Alert.alert` exibe "Sua sessão expirou" + redirect para login
+- **Handler de sessão registrável**: `registerSessionExpiredHandler()` em `api.ts`; registrado no root layout via `useEffect` em `app/_layout.tsx`
+- **Utilitário centralizado de erros** `src/utils/errors.ts`: `mapError()` retorna mensagem humana em português por código HTTP; `isSessionExpired()` detecta erros de sessão
+- **Retry e pull-to-refresh na lista de Combinados**: botão "Tentar novamente" no estado de erro; `RefreshControl` no `FlatList`
+
+### Arquivos criados
+
+| Arquivo | Descrição |
+|---|---|
+| `apps/mobile/src/utils/errors.ts` | `mapError(e)` e `isSessionExpired(e)` — utilitários de erro centralizados |
+
+### Arquivos alterados
+
+| Arquivo | O que mudou |
+|---|---|
+| `apps/mobile/src/services/api.ts` | Interceptor 401 → refresh → retry; `registerSessionExpiredHandler`; `clearTokens`; `refreshInFlight` |
+| `apps/mobile/app/_layout.tsx` | Registra `sessionExpiredHandler`; Alert de sessão expirada + redirect para login |
+| `apps/mobile/app/(app)/agreements.tsx` | Botão retry no estado de erro; `RefreshControl` no `FlatList`; usa `mapError` |
+
+### Endpoints consumidos
+
+| Método | Rota | Quando |
+|---|---|---|
+| POST | `/api/v1/auth/refresh` | Automaticamente ao receber 401 em qualquer requisição autenticada |
+
+### Decisões desta fase
+
+- Nenhuma regra financeira foi alterada
+- Schema não foi alterado / migration não foi rodada / commit não foi feito
+- Fitbank não integrado / Pix real não implementado / KYC não implementado / blockchain não integrada
+- Notificações push e botão de reembolso permanecem para a Fase 14
+
+### Validação
+
+- `pnpm --filter @selo/mobile typecheck` → ✅ limpo, sem erros TypeScript
+- `pnpm --filter @selo/api build` → ✅ limpo, sem regressão no backend
 
 ---
 
 ## 7. Próxima Fase
 
-### Fase 13 — Reembolso, JWT Refresh e Notificações Push
+### Fase 14 — Upload de Avatar, Notificações Push e Botão de Reembolso
 
-Objetivo: completar o fluxo mobile com reembolso pelo app, refresh automático do JWT (401 → refresh → retry) e notificações push locais.
+Objetivo: completar o fluxo mobile com upload de avatar, notificações push locais (Expo Notifications) e botão de reembolso pelo app.
 
 O que implementar:
-- Botão "Reembolsar" no app para acordos `ACTIVE + FUNDS_HELD` (chama `POST /agreements/:id/refund`)
-- Interceptor de 401 → `POST /auth/refresh` → retry automático (no `api.ts`)
+- Upload de avatar de perfil (PATCH /users/me/profile com avatarUrl ou endpoint dedicado)
 - Notificações push locais (Expo Notifications) para eventos de acordo
-- Upload de avatar de perfil
+- Botão "Reembolsar" no app para acordos `ACTIVE + FUNDS_HELD` (chama `POST /agreements/:id/refund`)
+- Upload de arquivo como evidência de contestação
 
 Não implementar ainda: Fitbank real, blockchain real, painel admin funcional, KYC.
 

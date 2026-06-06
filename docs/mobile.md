@@ -520,9 +520,110 @@ O token JWT é armazenado via `expo-secure-store`. Para testes:
 
 | Limitação | Quando resolve |
 |---|---|
-| Refresh automático do JWT (401 → refresh → retry) | Fase 13 |
-| Upload de avatar | Fase 13 |
-| Notificações push | Fase 13 |
-| Botão "Reembolsar" no app | Fase 13 |
+| Refresh automático do JWT (401 → refresh → retry) | Fase 13 ✅ |
+| Upload de avatar | Fase 14 |
+| Notificações push | Fase 14 |
+| Botão "Reembolsar" no app | Fase 14 |
 | Validação de pixKey com o Banco Central | Produção (Fitbank) |
 | Criptografia do pixKey em armazenamento | Produção (KMS) |
+
+---
+
+## Fase 13 — Infraestrutura Mobile de Sessão, Refresh JWT e Tratamento Global de Erros (Implementado)
+
+### Objetivo
+
+Estabilizar a base mobile de sessão e erros. Sem nova regra de negócio financeira — foco em fazer o app sobreviver à expiração do token sem quebrar a experiência do usuário.
+
+### O que foi implementado
+
+- **Interceptor de refresh automático no `api.ts`**: quando qualquer requisição retorna 401, o cliente HTTP tenta automaticamente `POST /auth/refresh` com o `refreshToken` do SecureStore, salva o novo `accessToken` e repete a requisição original — sem interromper o usuário.
+- **Proteção contra múltiplos refresh simultâneos**: `refreshInFlight` é uma Promise compartilhada — se várias requisições falham com 401 ao mesmo tempo, apenas um refresh é disparado; as demais aguardam o resultado.
+- **Proteção contra loop infinito**: rotas de autenticação (`/auth/refresh`, `/auth/login`, `/auth/register`) nunca disparam novo refresh ao receber 401 — verificado por `isAuthPath()`.
+- **Logout automático quando refresh falha**: se `POST /auth/refresh` retornar erro (token expirado ou revogado), os tokens são limpos do SecureStore e o `onSessionExpired` callback é chamado.
+- **Handler de sessão expirada no root layout**: `app/_layout.tsx` registra um callback via `registerSessionExpiredHandler()` que exibe `Alert.alert` com a mensagem "Sua sessão expirou. Entre novamente para continuar." e redireciona para `/(auth)/login` ao confirmar.
+- **Utilitário centralizado de erros** (`src/utils/errors.ts`): `mapError(e)` converte qualquer erro em mensagem humana em português; `isSessionExpired(e)` detecta erros de sessão expirada.
+- **Retry na tela Combinados**: botão "Tentar novamente" exibido quando a lista falha ao carregar; pull-to-refresh (swipe down) adicionado ao `FlatList`.
+
+### Arquivos criados
+
+| Arquivo | Descrição |
+|---|---|
+| `apps/mobile/src/utils/errors.ts` | `mapError(e)` — mensagens humanas por código HTTP; `isSessionExpired(e)` — detecta sessão expirada |
+
+### Arquivos alterados
+
+| Arquivo | O que mudou |
+|---|---|
+| `apps/mobile/src/services/api.ts` | Interceptor de 401 → refresh automático → retry; `registerSessionExpiredHandler()`; `clearTokens()`; `refreshInFlight` para evitar refreshes paralelos |
+| `apps/mobile/app/_layout.tsx` | Registra `registerSessionExpiredHandler` no `useEffect`; exibe Alert e redireciona para login quando sessão expira definitivamente |
+| `apps/mobile/app/(app)/agreements.tsx` | Botão "Tentar novamente" no estado de erro; `RefreshControl` (pull-to-refresh) no `FlatList`; usa `mapError` para mensagens amigáveis |
+
+### Fluxo de refresh automático
+
+```
+Requisição qualquer (ex: GET /agreements)
+  → 401 recebido
+  → isRetry? NÃO | isAuthPath? NÃO
+  → attemptTokenRefresh()
+      → refreshToken existe no SecureStore?
+          SIM → POST /auth/refresh
+                  OK → salva novo accessToken → repete requisição → ✅ transparente para o usuário
+                  Falha → return false
+          NÃO → return false
+  → refresh retornou false?
+      → clearTokens()
+      → onSessionExpired?.() → Alert → router.replace('/(auth)/login')
+      → throw Error('SESSION_EXPIRED')
+```
+
+### Mensagens padronizadas por código HTTP (mapError)
+
+| Código / Cenário | Mensagem exibida |
+|---|---|
+| `SESSION_EXPIRED` / 401 | "Sua sessão expirou. Entre novamente para continuar." |
+| 400 | Mensagem específica do backend ou "Dados inválidos. Verifique as informações e tente novamente." |
+| 403 | "Você não tem permissão para fazer isso." |
+| 404 | "Não encontramos esse registro." |
+| 409 | Mensagem específica do backend ou "Essa ação não está disponível no estado atual do combinado." |
+| 500 | "Tente novamente em alguns instantes." |
+| Erro de rede | "Não foi possível conectar ao Selo agora." |
+| Outros | Mensagem do backend ou "Algo deu errado. Tente novamente." |
+
+### Telas impactadas
+
+| Tela | Impacto |
+|---|---|
+| Todas as telas autenticadas | Refresh automático de JWT — nenhuma mudança visual |
+| Qualquer tela com 401 não resolvível | Alert "Sessão expirada" + redirect para login (via root layout) |
+| Lista de Combinados | Botão retry + pull-to-refresh |
+| Home Wallet | Já tinha retry — sem alteração |
+| Perfil | Já tinha RefreshControl — sem alteração |
+| Detalhe do acordo | Já tratava 401 — agora com refresh automático transparente |
+
+### Endpoints consumidos
+
+| Método | Rota | Quando |
+|---|---|---|
+| POST | `/api/v1/auth/refresh` | Automaticamente quando qualquer requisição recebe 401 |
+
+### Decisões desta fase
+
+- **`registerSessionExpiredHandler` em vez de contexto global**: mais simples, sem Provider extra; o root layout é o lugar certo para interceptar eventos globais de sessão.
+- **Promise compartilhada `refreshInFlight`**: impede que múltiplas requisições simultâneas com 401 disparem múltiplos `POST /auth/refresh`. O segundo a terceiro pedido aguardam o mesmo refresh.
+- **`isAuthPath` impede loop**: rotas de auth não disparam refresh para evitar `POST /refresh → 401 → POST /refresh → ...`.
+- **`isRetry = true` impede double retry**: se a requisição repetida após refresh ainda retornar 401, o erro é lançado diretamente sem novo ciclo.
+- **`mapError` recebe `unknown`**: cobre tanto erros lançados pelo `api.ts` (com `.status`) quanto strings de erro dos hooks (convertidas via `new Error(msg)`).
+- **Sem alteração de regras financeiras**: nenhuma lógica de acordo, garantia, disputa, payout ou refund foi alterada.
+- **Sem migration**: schema Prisma não foi alterado.
+- **Sem commit**: conforme instrução.
+
+### Limitações desta fase (Fase 13)
+
+| Limitação | Quando resolve |
+|---|---|
+| Upload de avatar de perfil | Fase 14 |
+| Notificações push locais (Expo Notifications) | Fase 14 |
+| Botão "Reembolsar" no app mobile | Fase 14 |
+| Validação de pixKey com Banco Central | Produção (Fitbank) |
+| Animações entre telas | Fase 14 |

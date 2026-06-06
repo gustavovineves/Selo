@@ -6,11 +6,13 @@ import {
   FlatList,
   TouchableOpacity,
   ScrollView,
+  RefreshControl,
 } from 'react-native';
 import { useAgreements } from '../../src/hooks/useAgreements';
 import type { ListAgreementsParams } from '../../src/services/agreements.service';
 import { AgreementCard, EmptyState, LoadingState } from '../../src/components';
 import { Colors, Spacing, Radii, FontSize, FontWeight } from '../../src/theme';
+import { mapError } from '../../src/utils/errors';
 
 interface FilterOption {
   label: string;
@@ -41,6 +43,8 @@ export default function AgreementsScreen() {
     setActiveFilter(index);
   }
 
+  const currentParams = FILTERS[activeFilter].params;
+
   return (
     <View style={styles.container}>
       {/* Filter chips */}
@@ -65,7 +69,7 @@ export default function AgreementsScreen() {
       </ScrollView>
 
       {/* Count */}
-      {!loading && (
+      {!loading && !error && (
         <Text style={styles.count}>
           {total} combinado{total !== 1 ? 's' : ''}
         </Text>
@@ -75,11 +79,20 @@ export default function AgreementsScreen() {
       {loading ? (
         <LoadingState message="Carregando combinados..." />
       ) : error ? (
-        <EmptyState
-          icon="cloud-offline-outline"
-          title="Erro ao carregar"
-          subtitle={error}
-        />
+        <View style={styles.errorContainer}>
+          <EmptyState
+            icon="cloud-offline-outline"
+            title="Não foi possível carregar"
+            subtitle={mapError(new Error(error))}
+          />
+          <TouchableOpacity
+            onPress={() => refresh(currentParams)}
+            style={styles.retryButton}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.retryText}>Tentar novamente</Text>
+          </TouchableOpacity>
+        </View>
       ) : (
         <FlatList
           data={agreements}
@@ -94,6 +107,14 @@ export default function AgreementsScreen() {
             />
           }
           showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={loading}
+              onRefresh={() => refresh(currentParams)}
+              tintColor={Colors.primary}
+              colors={[Colors.primary]}
+            />
+          }
         />
       )}
     </View>
@@ -142,5 +163,22 @@ const styles = StyleSheet.create({
   list: {
     paddingHorizontal: Spacing.lg,
     paddingBottom: Spacing.xxl,
+  },
+  errorContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  retryButton: {
+    marginTop: Spacing.sm,
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.lg,
+    backgroundColor: Colors.primary,
+    borderRadius: Radii.full,
+  },
+  retryText: {
+    color: Colors.white,
+    fontSize: FontSize.sm,
+    fontWeight: FontWeight.semibold,
   },
 });
