@@ -1,6 +1,6 @@
 # Progresso do Projeto Selo
 
-Última atualização: 2026-06-06 (Fase 15 — Painel Admin Visual Web para Operação de Disputas)
+Última atualização: 2026-06-06 (Fase 16 — Testes Automatizados do MVP)
 
 ---
 
@@ -44,6 +44,7 @@
 | App Mobile (Refresh JWT, Interceptor 401, Erros Globais) | ✅ Implementado (Fase 13) |
 | App Mobile (Notificações In-App, Central de Atividades, Badge) | ✅ Implementado (Fase 14) |
 | Painel Admin Web — Operação de Disputas | ✅ Implementado (Fase 15) |
+| Testes Automatizados do MVP (142 testes unitários) | ✅ Implementado (Fase 16) |
 | Score de Confiança | ✅ recordEvent implementado (Fase 5 e 6) |
 | Git local | ✅ Limpo após commit da Fase 4 |
 
@@ -824,9 +825,78 @@ Os módulos abaixo existem como stubs (`NotImplementedException`) ou aguardam as
 
 ---
 
+## 5k. Fase 16 — Testes Automatizados do MVP (Implementada)
+
+### Objetivo
+
+Criar uma base inicial de testes unitários para proteger o núcleo do MVP contra regressões, sem adicionar funcionalidade financeira real, sem alterar regras de negócio, sem alterar schema e sem movimentar dinheiro.
+
+### O que foi implementado
+
+- **9 suítes de testes unitários** cobrindo todos os serviços críticos do backend
+- **142 testes** passando com Exit 0
+- **Mocks de Prisma** via `jest.fn()` — sem banco real necessário
+- **Factory de dados de teste** compartilhada em `src/test/helpers/factories.ts`
+- **Tempo de execução**: ~7 segundos para toda a suíte
+
+### Arquivos criados
+
+| Arquivo | Testes |
+|---|---|
+| `apps/api/src/test/helpers/factories.ts` | Factories e mock do PrismaService |
+| `apps/api/src/modules/auth/auth.service.spec.ts` | 18 testes — Auth, JWT, refresh, logout |
+| `apps/api/src/modules/receiving-keys/receiving-keys.service.spec.ts` | 21 testes — Chave de Recebimento do App |
+| `apps/api/src/modules/receiving-destinations/receiving-destinations.service.spec.ts` | 19 testes — Destino de Recebimento |
+| `apps/api/src/modules/agreements/agreements.service.spec.ts` | 30 testes — Acordos simples e com garantia |
+| `apps/api/src/modules/payments/payments.service.spec.ts` | 6 testes — Pix simulado |
+| `apps/api/src/modules/disputes/disputes.service.spec.ts` | 10 testes — Disputas formais |
+| `apps/api/src/modules/admin/admin.service.spec.ts` | 15 testes — Resolução admin |
+| `apps/api/src/modules/notifications/notifications.service.spec.ts` | 11 testes — Notificações in-app |
+| `apps/api/src/modules/trust-score/trust-score.service.spec.ts` | 12 testes — Score de confiança |
+| `docs/tests.md` | Documentação completa da estratégia de testes |
+
+### Fluxos críticos cobertos
+
+- Auth completo (registro, login, refresh, logout, getMe)
+- Detecção de reutilização de refresh token → revogação automática
+- Normalização case-insensitive da Chave de Recebimento
+- Mascaramento de dados sensíveis do Destino de Recebimento
+- Bloqueio de exclusão com pendências
+- Criação de acordo simples e com garantia
+- Abertura de disputa → financialStatus DISPUTED, garantia FROZEN_DISPUTE
+- Release e confirmCompletion bloqueados por disputa aberta
+- Pix simulado → garantia LOCKED
+- Dupla confirmação (idempotência)
+- Resolução admin (resolve-release e resolve-refund)
+- Trust score: deltas, limites 0–1000, nível por faixa
+- Notificações in-app (send, findAll, markRead, markAllRead)
+
+### Validação
+
+- `pnpm --filter @selo/api test` → ✅ 142 testes, 0 falhas
+- `pnpm --filter @selo/api build` → ✅ Exit 0
+- `pnpm --filter @selo/mobile typecheck` → ✅ Exit 0
+- `pnpm --filter @selo/admin typecheck` → ✅ Exit 0
+
+### Confirmações obrigatórias
+
+- Schema Prisma não foi alterado
+- Migration não foi rodada
+- Commit não foi feito
+- Fitbank não integrado
+- Pix real não implementado
+- Blockchain real não implementada
+- KYC não implementado
+- Push notifications reais não implementadas
+- Chat não implementado
+- Nenhuma regra financeira foi alterada
+- Nenhum dinheiro real é movimentado
+
+---
+
 ## 7. Próxima Fase
 
-Fase 16 sugerida: Auth admin real (AdminUser + JWT separado), upload de avatar no mobile, push notifications reais (Expo Notifications) ou integração Fitbank.
+Fase 17 sugerida: Auth admin real (AdminUser + JWT separado), testes E2E com banco PostgreSQL real, upload de avatar no mobile, push notifications reais (Expo Notifications) ou integração Fitbank.
 
 Não implementar sem instrução explícita: Fitbank real, blockchain real, KYC, push notifications reais.
 
@@ -897,3 +967,4 @@ Invoke-RestMethod -Uri "http://localhost:3000/api/v1/receiving-keys/resolve/dev"
 | [docs/modules.md](modules.md) | Endpoints de todos os módulos do backend |
 | [docs/getting-started.md](getting-started.md) | Setup inicial do ambiente |
 | [docs/mobile.md](mobile.md) | App mobile: estrutura, telas, componentes, como rodar, limitações |
+| [docs/tests.md](tests.md) | Testes automatizados: estratégia, cobertura, comandos, limitações |
