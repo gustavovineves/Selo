@@ -1,4 +1,4 @@
-# Testes Automatizados — Selo API (Fase 16)
+# Testes Automatizados — Selo API (Fase 17)
 
 ## Objetivo
 
@@ -55,8 +55,11 @@ Os testes unitários usam mocks do `PrismaService` via `jest.fn()` em vez de um 
 apps/api/src/
 ├── test/
 │   └── helpers/
-│       └── factories.ts          ← Factories de dados de teste + mock do Prisma
+│       └── factories.ts          ← Factories de dados de teste + mock do Prisma (incl. makeAdminUser)
 ├── modules/
+│   ├── admin/
+│   │   ├── admin-auth.service.spec.ts  ← Fase 17: login, getMe, logout admin
+│   │   └── admin.service.spec.ts
 │   ├── auth/
 │   │   └── auth.service.spec.ts
 │   ├── receiving-keys/
@@ -82,15 +85,35 @@ apps/api/src/
 ## Resultado da Suíte
 
 ```
-Test Suites: 9 passed, 9 total
-Tests:       142 passed, 142 total
+Test Suites: 10 passed, 10 total
+Tests:       155 passed, 155 total
 Snapshots:   0 total
-Time:        ~7s
+Time:        ~15s
 ```
 
 ---
 
 ## Cobertura por Módulo
+
+### Auth Admin — AdminAuthService (13 testes) — Fase 17
+
+| Cenário | Coberto |
+|---|---|
+| Login com credenciais válidas → accessToken | ✅ |
+| JWT assinado com payload type=admin | ✅ |
+| Email normalizado para lowercase antes de buscar | ✅ |
+| Login com admin inexistente → UnauthorizedException | ✅ |
+| Login com senha incorreta → UnauthorizedException | ✅ |
+| Login com admin SUSPENDED → UnauthorizedException | ✅ |
+| Login com admin DELETED → UnauthorizedException | ✅ |
+| lastLoginAt atualizado após login bem-sucedido | ✅ |
+| Mensagem de erro genérica (timing-safe — mesma msg para inexistente e senha errada) | ✅ |
+| getMe retorna dados sem passwordHash | ✅ |
+| getMe → NotFoundException para admin inexistente | ✅ |
+| getMe retorna lastLoginAt quando preenchido | ✅ |
+| logout retorna mensagem de confirmação | ✅ |
+
+---
 
 ### Auth (25 testes)
 

@@ -1,5 +1,28 @@
 // ── Shared admin types aligned with backend response shapes ──────────────────
 
+export interface AdminUser {
+  id: string;
+  email: string;
+  name: string;
+  role: string;
+}
+
+export interface AdminLoginResponse {
+  accessToken: string;
+  expiresIn: string;
+  admin: AdminUser;
+}
+
+export interface AdminMeResponse {
+  id: string;
+  email: string;
+  name: string;
+  role: string;
+  status: string;
+  lastLoginAt: string | null;
+  createdAt: string;
+}
+
 export interface AdminStats {
   totalUsers: number;
   totalAgreements: number;

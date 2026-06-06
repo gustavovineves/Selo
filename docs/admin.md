@@ -1,4 +1,4 @@
-# Painel Admin — Selo (Fase 15)
+# Painel Admin — Selo (Fase 17)
 
 ## Objetivo
 
@@ -40,24 +40,64 @@ Acesse: **http://localhost:3001**
 
 ---
 
-## Autenticação Admin (Provisória — MVP)
+## Autenticação Admin (Fase 17 — AdminUser + JWT)
 
-A autenticação usa o token estático configurado no backend:
+A autenticação agora usa `AdminUser` com JWT separado do JWT de usuário comum.
 
-1. No arquivo `apps/api/.env`, defina `ADMIN_TOKEN=seu-token-aqui`
-2. No painel, acesse `/login` e cole o mesmo token
-3. O token é validado contra `GET /api/v1/admin/health` via header `X-Admin-Token`
-4. Se válido, é salvo em `localStorage` e todas as chamadas subsequentes incluem `X-Admin-Token: <token>`
+### Como funciona
 
-**Importante:** Esta autenticação é provisória para MVP/desenvolvimento.  
-Em produção, será substituída por `AdminUser` com JWT separado.
+1. Acesse `/login` no painel e informe **email + senha** de um `AdminUser` cadastrado no banco
+2. O painel chama `POST /api/v1/admin/auth/login` e recebe um `accessToken` JWT admin
+3. O token é salvo em `localStorage` e enviado como `Authorization: Bearer <token>` em todas as chamadas
+4. O `AdminJwtGuard` valida: assina com `ADMIN_JWT_SECRET` e exige `payload.type === "admin"`
+5. Tokens de usuário comum são **rejeitados** nas rotas admin (secret e payload diferentes)
+
+### Variáveis de ambiente necessárias (apps/api/.env)
+
+```env
+ADMIN_JWT_SECRET=seu-segredo-admin-de-pelo-menos-64-chars
+ADMIN_JWT_EXPIRES_IN=1d
+```
+
+### Endpoints de autenticação admin
+
+| Método | Rota | Auth | Descrição |
+|---|---|---|---|
+| POST | `/api/v1/admin/auth/login` | Público | Login com email + senha de AdminUser |
+| GET | `/api/v1/admin/auth/me` | AdminJwtGuard | Dados do admin autenticado |
+| POST | `/api/v1/admin/auth/logout` | AdminJwtGuard | Logout (stateless; limpa token no client) |
+
+### Payload do JWT admin
+
+```json
+{
+  "sub": "admin-id",
+  "email": "admin@selo.app",
+  "role": "ADMIN",
+  "type": "admin"
+}
+```
 
 ### Segurança implementada
 
-- Token nunca fica hardcoded no código
-- Token não é exibido em tela após salvo (input type=password por padrão)
-- Logout limpa o token do localStorage
-- Se a API retornar 401/403, o token é limpo e o usuário é redirecionado para login automaticamente
+- JWT assinado com `ADMIN_JWT_SECRET` (diferente do `JWT_SECRET` de usuário)
+- `payload.type === "admin"` verificado pelo guard — rejeita tokens de usuário
+- Tokens admin são rejeitados em rotas de usuário (ADMIN_JWT_SECRET ≠ JWT_SECRET)
+- Senha armazenada com bcrypt (12 rounds)
+- Erro genérico "Credenciais inválidas" para email ou senha incorretos
+- `passwordHash` nunca retornado em nenhum endpoint
+- 401/403 da API limpa o token e redireciona para login automaticamente
+
+### Como criar um AdminUser no banco (dev)
+
+Use o Prisma Studio (`pnpm db:studio`) → tabela `admin_users`, ou insira via SQL:
+
+```sql
+INSERT INTO admin_users (id, email, name, password_hash, role, status, created_at, updated_at)
+VALUES (gen_random_uuid(), 'admin@selo.app', 'Admin Selo', '<hash-bcrypt>', 'ADMIN', 'ACTIVE', NOW(), NOW());
+```
+
+O hash pode ser gerado com `bcrypt.hashSync('sua-senha', 12)` em Node.js.
 
 ---
 
@@ -229,7 +269,7 @@ O painel usa inline styles com uma paleta consistente:
 
 | Limitação | Plano futuro |
 |---|---|
-| Auth por token estático no localStorage | `AdminUser` com JWT separado e sessão segura |
+| Auth por JWT (stateless) — sem invalidação server-side | Sessão de admin com blacklist ou refresh token |
 | Sem paginação de evidências | Paginação com limite e cursor |
 | Sem filtro por data ou valor | Filtros avançados |
 | Sem upload de arquivo como evidência | Upload de imagem/PDF |

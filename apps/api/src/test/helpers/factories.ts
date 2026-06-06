@@ -361,6 +361,7 @@ export function createPrismaMock() {
     trustScoreEvent: { create: fn() },
     auditLog: { create: fn() },
     blockchainRecord: { create: fn(), upsert: fn() },
+    adminUser: { findUnique: fn(), update: fn() },
     $connect: fn(),
     $disconnect: fn(),
   };
@@ -380,4 +381,22 @@ export function createPrismaMock() {
   );
 
   return mock as typeof mock;
+}
+
+// ── AdminUser ──────────────────────────────────────────────────
+
+export function makeAdminUser(overrides: Record<string, unknown> = {}) {
+  return {
+    id: 'admin-001',
+    email: 'admin@selo.app',
+    name: 'Admin Selo',
+    passwordHash: '$2b$12$hashed',
+    role: 'ADMIN',
+    status: 'ACTIVE',
+    lastLoginAt: null,
+    createdAt: new Date('2026-01-01'),
+    updatedAt: new Date('2026-01-01'),
+    deletedAt: null,
+    ...overrides,
+  };
 }

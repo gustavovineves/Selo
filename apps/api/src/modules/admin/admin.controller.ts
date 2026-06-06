@@ -8,17 +8,16 @@ import {
   UseGuards,
   HttpCode,
   HttpStatus,
-  Req,
 } from '@nestjs/common';
-import { Request } from 'express';
 import { AdminService } from './admin.service';
-import { AdminTokenGuard, AdminContext } from '../../common/guards/admin-token.guard';
+import { AdminJwtGuard, AdminContext } from '../../common/guards/admin-jwt.guard';
+import { CurrentAdmin } from '../../common/decorators/current-admin.decorator';
 import { AdminResolveReleaseDto } from './dto/admin-resolve-release.dto';
 import { AdminResolveRefundDto } from './dto/admin-resolve-refund.dto';
 import { AdminListDisputesDto } from './dto/admin-list-disputes.dto';
 
 @Controller('admin')
-@UseGuards(AdminTokenGuard)
+@UseGuards(AdminJwtGuard)
 export class AdminController {
   constructor(private readonly service: AdminService) {}
 
@@ -49,20 +48,20 @@ export class AdminController {
   @Post('disputes/:id/resolve-release')
   @HttpCode(HttpStatus.OK)
   resolveRelease(
-    @Req() req: Request & { adminContext: AdminContext },
+    @CurrentAdmin() admin: AdminContext,
     @Param('id') id: string,
     @Body() dto: AdminResolveReleaseDto,
   ) {
-    return this.service.resolveRelease(req.adminContext.id, id, dto);
+    return this.service.resolveRelease(admin.id, id, dto);
   }
 
   @Post('disputes/:id/resolve-refund')
   @HttpCode(HttpStatus.OK)
   resolveRefund(
-    @Req() req: Request & { adminContext: AdminContext },
+    @CurrentAdmin() admin: AdminContext,
     @Param('id') id: string,
     @Body() dto: AdminResolveRefundDto,
   ) {
-    return this.service.resolveRefund(req.adminContext.id, id, dto);
+    return this.service.resolveRefund(admin.id, id, dto);
   }
 }

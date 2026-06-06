@@ -2,13 +2,15 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { saveAdminToken, isAuthenticated } from '@/lib/api';
+import type { AdminLoginResponse } from '@/lib/types';
 
 export default function LoginPage() {
   const router = useRouter();
-  const [token, setToken] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [showToken, setShowToken] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   useEffect(() => {
     if (isAuthenticated()) router.replace('/dashboard');
@@ -16,9 +18,9 @@ export default function LoginPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const trimmed = token.trim();
-    if (!trimmed) {
-      setError('Informe o token de administrador.');
+    const trimmedEmail = email.trim().toLowerCase();
+    if (!trimmedEmail || !password) {
+      setError('Preencha email e senha.');
       return;
     }
 
@@ -29,19 +31,25 @@ export default function LoginPage() {
       const apiUrl =
         process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3000/api/v1';
 
-      // Raw fetch para evitar o redirect automático do apiRequest em 401
-      const res = await fetch(`${apiUrl}/admin/health`, {
-        headers: { 'X-Admin-Token': trimmed },
+      const res = await fetch(`${apiUrl}/admin/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: trimmedEmail, password }),
       });
 
+      const data: unknown = await res.json().catch(() => ({}));
+
       if (!res.ok) {
-        setError(
-          'Token inválido. Verifique o valor da variável ADMIN_TOKEN no backend.',
-        );
+        const raw = data as { message?: string | string[] };
+        const msg = Array.isArray(raw.message)
+          ? raw.message.join(', ')
+          : (raw.message ?? 'Credenciais inválidas.');
+        setError(msg);
         return;
       }
 
-      saveAdminToken(trimmed);
+      const { accessToken } = data as AdminLoginResponse;
+      saveAdminToken(accessToken);
       router.replace('/dashboard');
     } catch {
       setError(
@@ -52,6 +60,9 @@ export default function LoginPage() {
       setLoading(false);
     }
   };
+
+  const inputBorder = (hasError: boolean) =>
+    `1.5px solid ${hasError ? '#EF4444' : '#D1D5DB'}`;
 
   return (
     <div
@@ -93,6 +104,39 @@ export default function LoginPage() {
         </div>
 
         <form onSubmit={handleSubmit}>
+          {/* Email */}
+          <div style={{ marginBottom: 16 }}>
+            <label
+              style={{
+                display: 'block',
+                fontSize: 13,
+                fontWeight: 600,
+                color: '#374151',
+                marginBottom: 7,
+              }}
+            >
+              Email
+            </label>
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="admin@selo.app"
+              autoComplete="email"
+              style={{
+                width: '100%',
+                padding: '12px 14px',
+                border: inputBorder(Boolean(error)),
+                borderRadius: 8,
+                fontSize: 14,
+                color: '#111827',
+                outline: 'none',
+                boxSizing: 'border-box',
+              }}
+            />
+          </div>
+
+          {/* Senha */}
           <div style={{ marginBottom: 20 }}>
             <label
               style={{
@@ -103,32 +147,29 @@ export default function LoginPage() {
                 marginBottom: 7,
               }}
             >
-              Token de administrador
+              Senha
             </label>
             <div style={{ position: 'relative' }}>
               <input
-                type={showToken ? 'text' : 'password'}
-                value={token}
-                onChange={(e) => setToken(e.target.value)}
-                placeholder="Cole o ADMIN_TOKEN aqui"
-                autoComplete="off"
-                spellCheck={false}
+                type={showPassword ? 'text' : 'password'}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="••••••••"
+                autoComplete="current-password"
                 style={{
                   width: '100%',
                   padding: '12px 44px 12px 14px',
-                  border: `1.5px solid ${error ? '#EF4444' : '#D1D5DB'}`,
+                  border: inputBorder(Boolean(error)),
                   borderRadius: 8,
                   fontSize: 14,
                   color: '#111827',
                   outline: 'none',
                   boxSizing: 'border-box',
-                  fontFamily: showToken ? 'monospace' : 'inherit',
-                  letterSpacing: showToken ? 0 : 3,
                 }}
               />
               <button
                 type="button"
-                onClick={() => setShowToken((v) => !v)}
+                onClick={() => setShowPassword((v) => !v)}
                 tabIndex={-1}
                 style={{
                   position: 'absolute',
@@ -142,9 +183,9 @@ export default function LoginPage() {
                   fontSize: 15,
                   padding: 2,
                 }}
-                aria-label={showToken ? 'Ocultar token' : 'Exibir token'}
+                aria-label={showPassword ? 'Ocultar senha' : 'Exibir senha'}
               >
-                {showToken ? '🙈' : '👁'}
+                {showPassword ? '🙈' : '👁'}
               </button>
             </div>
           </div>
@@ -168,25 +209,25 @@ export default function LoginPage() {
 
           <button
             type="submit"
-            disabled={loading || !token.trim()}
+            disabled={loading || !email.trim() || !password}
             style={{
               width: '100%',
               padding: '14px',
-              background: loading || !token.trim() ? '#8B5CF6' : '#5B21B6',
+              background: loading || !email.trim() || !password ? '#8B5CF6' : '#5B21B6',
               color: '#fff',
               border: 'none',
               borderRadius: 8,
               fontSize: 15,
               fontWeight: 600,
-              cursor: loading || !token.trim() ? 'not-allowed' : 'pointer',
-              opacity: loading || !token.trim() ? 0.7 : 1,
+              cursor: loading || !email.trim() || !password ? 'not-allowed' : 'pointer',
+              opacity: loading || !email.trim() || !password ? 0.7 : 1,
             }}
           >
-            {loading ? 'Verificando...' : 'Entrar no painel'}
+            {loading ? 'Autenticando...' : 'Entrar no painel'}
           </button>
         </form>
 
-        {/* Dev note */}
+        {/* Nota de ambiente */}
         <div
           style={{
             marginTop: 24,
@@ -199,20 +240,13 @@ export default function LoginPage() {
             lineHeight: 1.6,
           }}
         >
-          <strong>Ambiente de desenvolvimento.</strong> O token é definido pela
-          variável de ambiente{' '}
-          <code
-            style={{
-              fontFamily: 'monospace',
-              background: '#FEF3C7',
-              padding: '1px 4px',
-              borderRadius: 3,
-            }}
-          >
-            ADMIN_TOKEN
+          <strong>Acesso restrito.</strong> Use as credenciais do{' '}
+          <code style={{ fontFamily: 'monospace' }}>AdminUser</code> cadastrado
+          no banco de dados. Configure{' '}
+          <code style={{ fontFamily: 'monospace', background: '#FEF3C7', padding: '1px 4px', borderRadius: 3 }}>
+            ADMIN_JWT_SECRET
           </code>{' '}
-          no arquivo <code style={{ fontFamily: 'monospace' }}>apps/api/.env</code>.
-          Esta autenticação é provisória para MVP.
+          em <code style={{ fontFamily: 'monospace' }}>apps/api/.env</code>.
         </div>
       </div>
     </div>

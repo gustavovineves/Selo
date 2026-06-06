@@ -1,6 +1,6 @@
 # Progresso do Projeto Selo
 
-Última atualização: 2026-06-06 (Fase 16 — Testes Automatizados do MVP)
+Última atualização: 2026-06-06 (Fase 17 — Auth Admin Real com AdminUser + JWT)
 
 ---
 
@@ -45,6 +45,7 @@
 | App Mobile (Notificações In-App, Central de Atividades, Badge) | ✅ Implementado (Fase 14) |
 | Painel Admin Web — Operação de Disputas | ✅ Implementado (Fase 15) |
 | Testes Automatizados do MVP (142 testes unitários) | ✅ Implementado (Fase 16) |
+| Auth Admin Real (AdminUser + JWT separado, 155 testes) | ✅ Implementado (Fase 17) |
 | Score de Confiança | ✅ recordEvent implementado (Fase 5 e 6) |
 | Git local | ✅ Limpo após commit da Fase 4 |
 
@@ -657,7 +658,7 @@ Os módulos abaixo existem como stubs (`NotImplementedException`) ou aguardam as
 | Blockchain (submissão real) | Futuro | `blockchain-records` |
 | Painel Admin funcional (Next.js) — operação de disputas | ✅ Implementado (Fase 15) | `apps/admin` |
 | Push notifications reais (Expo Notifications) | Futuro | `notifications` |
-| Auth admin real (AdminUser + JWT) | Futuro | `admin` — atualmente por X-Admin-Token provisório |
+| Auth admin real (AdminUser + JWT) | ✅ Implementado (Fase 17) | `admin` — AdminJwtGuard + JWT separado |
 | Upload de arquivo como evidência de contestação | Futuro | `apps/mobile` |
 | Upload de avatar | Futuro | `apps/mobile` |
 
@@ -894,9 +895,107 @@ Criar uma base inicial de testes unitários para proteger o núcleo do MVP contr
 
 ---
 
+## 5l. Fase 17 — Auth Admin Real (AdminUser + JWT) (Implementada)
+
+### Objetivo
+
+Substituir a autenticação provisória do painel admin (`X-Admin-Token` estático) por autenticação real usando `AdminUser` com JWT admin separado.
+
+### Endpoints criados
+
+| Método | Rota | Auth | Descrição |
+|---|---|---|---|
+| POST | `/api/v1/admin/auth/login` | Público | Login com email + senha de AdminUser |
+| GET | `/api/v1/admin/auth/me` | AdminJwtGuard | Dados do admin autenticado |
+| POST | `/api/v1/admin/auth/logout` | AdminJwtGuard | Logout (stateless) |
+
+### Guards/strategies criados
+
+| Arquivo | Descrição |
+|---|---|
+| `common/guards/admin-jwt.guard.ts` | `AdminJwtGuard` — valida JWT admin + exporta `AdminContext` |
+| `common/strategies/admin-jwt.strategy.ts` | `AdminJwtStrategy` — Passport strategy `"admin-jwt"`, valida `type==="admin"` |
+| `common/decorators/current-admin.decorator.ts` | `@CurrentAdmin()` — extrai `AdminContext` do request |
+
+### Arquivos criados
+
+| Arquivo | Descrição |
+|---|---|
+| `modules/admin/dto/admin-login.dto.ts` | DTO de login: email + senha |
+| `modules/admin/admin-auth.service.ts` | login, getMe, logout |
+| `modules/admin/admin-auth.controller.ts` | Controller `/admin/auth/*` |
+| `modules/admin/admin-auth.service.spec.ts` | 13 testes unitários |
+| `common/guards/admin-jwt.guard.ts` | Guard JWT admin |
+| `common/strategies/admin-jwt.strategy.ts` | Strategy JWT admin |
+| `common/decorators/current-admin.decorator.ts` | Decorator admin |
+
+### Arquivos alterados
+
+| Arquivo | O que mudou |
+|---|---|
+| `modules/admin/admin.module.ts` | JwtModule admin, novos providers e controllers |
+| `modules/admin/admin.controller.ts` | Switch de `AdminTokenGuard` → `AdminJwtGuard`; `@CurrentAdmin()` em vez de `req.adminContext` |
+| `apps/api/.env.example` | Adicionado `ADMIN_JWT_SECRET` e `ADMIN_JWT_EXPIRES_IN` |
+| `apps/admin/src/lib/api.ts` | `X-Admin-Token` → `Authorization: Bearer <token>` |
+| `apps/admin/src/lib/types.ts` | Adicionados `AdminUser`, `AdminLoginResponse`, `AdminMeResponse` |
+| `apps/admin/src/app/login/page.tsx` | Formulário email + senha; chama `POST /admin/auth/login` |
+| `apps/api/src/test/helpers/factories.ts` | `makeAdminUser()` + `adminUser` no mock do Prisma |
+| `docs/admin.md` | Seção de autenticação atualizada para Fase 17 |
+
+### Como funciona o JWT admin
+
+```
+POST /admin/auth/login { email, password }
+  → bcrypt.compare(password, admin.passwordHash)
+  → jwtService.sign({ sub, email, role, type: "admin" }, ADMIN_JWT_SECRET)
+  → { accessToken, expiresIn, admin: { id, email, name, role } }
+
+Rotas protegidas:
+  Authorization: Bearer <accessToken>
+  → AdminJwtStrategy.validate(payload)
+  → verifica payload.type === "admin"
+  → verifica adminUser.status === "ACTIVE"
+  → req.user = { id, email, role }
+  → @CurrentAdmin() extrai req.user
+```
+
+### Separação de JWT
+
+| Token | Secret env | Payload type | Valida no guard |
+|---|---|---|---|
+| Usuário | `JWT_SECRET` | não tem `type` | `JwtAuthGuard` |
+| Admin | `ADMIN_JWT_SECRET` | `type: "admin"` | `AdminJwtGuard` |
+
+Tokens de usuário são rejeitados em rotas admin (secret diferente + `type !== "admin"`).
+Tokens admin são rejeitados em rotas de usuário (secret diferente, falha na assinatura).
+
+### Validação
+
+- `pnpm --filter @selo/api test` → ✅ **155 testes, 10 suítes, 0 falhas**
+- `pnpm --filter @selo/api build` → ✅ Exit 0
+- `pnpm --filter @selo/mobile typecheck` → ✅ Exit 0
+- `pnpm --filter @selo/admin typecheck` → ✅ Exit 0
+
+### Confirmações obrigatórias
+
+- Schema Prisma não foi alterado
+- Migration não foi rodada
+- Commit não foi feito
+- Fitbank não integrado
+- Pix real não implementado
+- Blockchain real não implementada
+- KYC não implementado
+- Push notifications reais não implementadas
+- Chat não implementado
+- Nenhuma regra financeira foi alterada
+- Nenhum dinheiro real foi movimentado
+- Fluxo de disputa humana não foi alterado
+
+---
+
 ## 7. Próxima Fase
 
-Fase 17 sugerida: Auth admin real (AdminUser + JWT separado), testes E2E com banco PostgreSQL real, upload de avatar no mobile, push notifications reais (Expo Notifications) ou integração Fitbank.
+Fase 18 sugerida: Testes E2E com banco PostgreSQL real, upload de avatar no mobile, push notifications reais (Expo Notifications) ou integração Fitbank.
 
 Não implementar sem instrução explícita: Fitbank real, blockchain real, KYC, push notifications reais.
 
@@ -968,3 +1067,4 @@ Invoke-RestMethod -Uri "http://localhost:3000/api/v1/receiving-keys/resolve/dev"
 | [docs/getting-started.md](getting-started.md) | Setup inicial do ambiente |
 | [docs/mobile.md](mobile.md) | App mobile: estrutura, telas, componentes, como rodar, limitações |
 | [docs/tests.md](tests.md) | Testes automatizados: estratégia, cobertura, comandos, limitações |
+| [docs/admin.md](admin.md) | Painel admin: auth real (AdminUser + JWT), endpoints, fluxo de disputa |

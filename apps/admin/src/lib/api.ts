@@ -49,7 +49,7 @@ export async function apiRequest<T>(
       method: opts.method ?? 'GET',
       headers: {
         'Content-Type': 'application/json',
-        ...(token ? { 'X-Admin-Token': token } : {}),
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
       ...(opts.body !== undefined ? { body: JSON.stringify(opts.body) } : {}),
     });
