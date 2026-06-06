@@ -6,5 +6,6 @@ export type AuthStackParams = {
 export type AppTabParams = {
   home: undefined;
   agreements: undefined;
+  create: undefined;
   profile: undefined;
 };

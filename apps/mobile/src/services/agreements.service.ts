@@ -1,17 +1,46 @@
 import { api } from './api';
-import type { Agreement } from '@selo/types';
+import type {
+  AgreementListItem,
+  AgreementsListResponse,
+} from '../types/api';
+
+export interface ListAgreementsParams {
+  status?: string;
+  financialStatus?: string;
+  myRole?: 'creator' | 'counterpart' | 'payer' | 'receiver';
+  pendingMyAction?: boolean;
+  hasGuarantee?: boolean;
+  inDispute?: boolean;
+  dueBefore?: string;
+  dueAfter?: string;
+  page?: number;
+  limit?: number;
+}
 
 export const agreementsService = {
-  list: (params?: { status?: string; page?: number }) =>
-    api.get<{ data: Agreement[]; total: number }>(`/agreements?${new URLSearchParams(params as Record<string, string>)}`),
+  list: (params?: ListAgreementsParams) => {
+    const qs = new URLSearchParams();
+    if (params) {
+      Object.entries(params).forEach(([key, value]) => {
+        if (value !== undefined && value !== null) {
+          qs.set(key, String(value));
+        }
+      });
+    }
+    const query = qs.toString();
+    return api.get<AgreementsListResponse>(`/agreements${query ? `?${query}` : ''}`);
+  },
 
-  getById: (id: string) => api.get<Agreement>(`/agreements/${id}`),
+  getById: (id: string) => api.get<AgreementListItem>(`/agreements/${id}`),
 
-  create: (payload: Partial<Agreement>) => api.post<Agreement>('/agreements', payload),
+  accept: (id: string) => api.post<AgreementListItem>(`/agreements/${id}/accept`, {}),
 
-  accept: (id: string) => api.patch(`/agreements/${id}/accept`, {}),
+  decline: (id: string) => api.post<AgreementListItem>(`/agreements/${id}/decline`, {}),
 
-  complete: (id: string) => api.patch(`/agreements/${id}/complete`, {}),
+  cancel: (id: string) => api.post<AgreementListItem>(`/agreements/${id}/cancel`, {}),
 
-  cancel: (id: string) => api.patch(`/agreements/${id}/cancel`, {}),
+  complete: (id: string) => api.post<AgreementListItem>(`/agreements/${id}/complete`, {}),
+
+  confirmCompletion: (id: string) =>
+    api.post<AgreementListItem>(`/agreements/${id}/confirm-completion`, {}),
 };

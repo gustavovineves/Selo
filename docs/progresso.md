@@ -1,6 +1,6 @@
 # Progresso do Projeto Selo
 
-Última atualização: 2026-06-05 (Fase 8 — destino de recebimento implementado)
+Última atualização: 2026-06-06 (Fase 9 — Mobile Shell + Home Wallet implementado)
 
 ---
 
@@ -37,6 +37,7 @@
 | Resolução admin de disputas | ✅ Implementado (Fase 6) |
 | Home/Wallet/Listagens | ✅ Implementado (Fase 7) |
 | Destino de Recebimento | ✅ Implementado (Fase 8) |
+| App Mobile (shell + home wallet) | ✅ Implementado (Fase 9) |
 | Score de Confiança | ✅ recordEvent implementado (Fase 5 e 6) |
 | Git local | ✅ Limpo após commit da Fase 4 |
 
@@ -429,38 +430,84 @@ Usa `events: { none: { actorId: userId, type: CONFIRMED } }` para detectar exata
 
 ---
 
+## 5e. Fase 9 — Mobile Shell + Home Wallet (Implementada)
+
+### Telas criadas
+
+| Tela | Arquivo | Endpoints consumidos |
+|---|---|---|
+| Home Wallet | `app/(app)/home.tsx` | `GET /agreements/summary` |
+| Combinados | `app/(app)/agreements.tsx` | `GET /agreements` (9 filtros) |
+| Criar (placeholder) | `app/(app)/create.tsx` | — |
+| Perfil | `app/(app)/profile.tsx` | `GET /auth/me`, `GET /receiving-keys/me`, `GET /receiving-destinations/me` |
+| Login | `app/(auth)/login.tsx` | `POST /auth/login` |
+| Cadastro | `app/(auth)/register.tsx` | `POST /auth/register` |
+
+### O que foi implementado
+
+- **Design system** completo (`src/theme/index.ts`): Colors, Spacing, Radii, FontSize, FontWeight, Shadow
+- **Componentes reutilizáveis**: StatusBadge, AgreementCard, EmptyState, LoadingState/SkeletonCard, PrimaryButton, FinancialCard, SectionHeader
+- **Bottom Navigation** com botão central "Criar" flutuante elevado
+- **Home Wallet**: saudação, score de confiança com cor por nível, chave Selo, 3 cartões financeiros (receber/pagar/protegido), chips de estatísticas, ações rápidas, seções por categoria
+- **Filtros visuais** na tela Combinados: 9 chips que passam parâmetros corretos para o backend
+- **Perfil**: avatar com iniciais, score, chave, destinos mascarados, sair
+- **Auth com formulários reais**: validação, loading, erros amigáveis
+- **Auth check assíncrono** no `index.tsx`: verifica SecureStore antes de redirecionar
+- **Fallback offline**: telas mostram erro + "Tentar novamente" sem crashar
+
+### Dependência adicionada
+
+- `@expo/vector-icons: ^14.0.0` — já estava no pnpm lockfile como dep transitiva
+
+### Decisões
+
+- **`expo-env.d.ts`**: declara `process.env.EXPO_PUBLIC_API_URL` globalmente para TypeScript sem precisar de `@types/node`
+- **`TouchableOpacityProps`** para o botão de tab customizado: compatível com o que expo-router injeta sem import de `@react-navigation/bottom-tabs`
+- **`Promise.allSettled`** no `useProfile`: se a chave ou os destinos não estiverem configurados (404), o perfil ainda carrega sem erro fatal
+- **Fluxo de criação placeholder**: tela informativa com Alert "Em breve" — escopo da Fase 10
+
+### Testes manuais — validação
+
+- ✅ `pnpm --filter @selo/mobile typecheck` — limpo
+- ✅ `pnpm --filter @selo/api build` — limpo, sem regressão no backend
+- App funciona com API rodando (`pnpm dev:api` + `pnpm dev:mobile`)
+
+---
+
 ## 6. O Que NÃO Foi Implementado Ainda
 
-Os módulos abaixo existem como stubs (`NotImplementedException`) e aguardam as fases futuras:
+Os módulos abaixo existem como stubs (`NotImplementedException`) ou aguardam as fases futuras:
 
 | Funcionalidade | Fase | Módulo |
 |---|---|---|
-| Integração real Fitbank/BaaS | Fase 9 | `pix` + `payments` |
-| Webhook real do PSP | Fase 9 | `pix` |
-| Blockchain (submissão real) | Fase 9 | `blockchain-records` |
-| Painel Admin funcional (Next.js) | Fase 9 | `apps/admin` |
-| Notificações push | Fase 9 | `notifications` |
-| Auth admin real (AdminUser + JWT) | Fase 9 | `admin` |
-| App mobile integrado | Fase 9 | `apps/mobile` |
+| Integração real Fitbank/BaaS | Fase 10 | `pix` + `payments` |
+| Webhook real do PSP | Fase 10 | `pix` |
+| Blockchain (submissão real) | Fase 10 | `blockchain-records` |
+| Painel Admin funcional (Next.js) | Fase 10 | `apps/admin` |
+| Notificações push | Fase 10 | `notifications` |
+| Auth admin real (AdminUser + JWT) | Fase 10 | `admin` |
+| Criação de combinado no mobile | Fase 10 | `apps/mobile` |
+| Detalhe de combinado no mobile | Fase 10 | `apps/mobile` |
+| Refresh automático do JWT (401 → refresh) | Fase 10 | `apps/mobile` |
 
 ---
 
 ## 7. Próxima Fase
 
-### Fase 9 — Integração Real e App Mobile
+### Fase 10 — Fluxo de Criação de Combinados no Mobile
 
-Objetivo: substituir simulações por integrações reais e construir as telas do app mobile.
+Objetivo: implementar o fluxo completo de criação de acordos no app, incluindo detalhe de acordos, ações (aceitar, recusar, confirmar), e manutenção de perfil.
 
 O que implementar:
-- App mobile (Expo): tela home usando `GET /agreements/summary`, listagens, detalhes
-- Integração Fitbank/BaaS real: cobrança Pix, payout, reembolso
-- Webhook real de confirmação do PSP (`POST /webhooks/pix/confirmation`)
-- Auth admin real: login de `AdminUser` com JWT separado
-- Painel Admin (`apps/admin`) funcional — lista disputas, resolve, vê acordos
-- Submissão real à blockchain (Ethereum/Polygon testnet)
-- Notificações push (Expo Notifications)
+- Tela de criação de acordo simples no mobile
+- Tela de criação de acordo com garantia no mobile
+- Tela de detalhe de acordo com ações contextuais
+- Refresh automático do JWT (interceptor de 401)
+- Edição de perfil: nome, avatar
+- Gerenciamento de chave e destino de recebimento pelo app
+- Notificações push locais (feedback de ação)
 
-Não implementar ainda: Fitbank produção, mainnet blockchain, KYC completo.
+Não implementar ainda: Fitbank real, blockchain real, painel admin, KYC.
 
 ---
 
@@ -528,3 +575,4 @@ Invoke-RestMethod -Uri "http://localhost:3000/api/v1/receiving-keys/resolve/dev"
 | [docs/database.md](database.md) | Todos os 22 models e 37 enums do schema Prisma |
 | [docs/modules.md](modules.md) | Endpoints de todos os módulos do backend |
 | [docs/getting-started.md](getting-started.md) | Setup inicial do ambiente |
+| [docs/mobile.md](mobile.md) | App mobile: estrutura, telas, componentes, como rodar, limitações |

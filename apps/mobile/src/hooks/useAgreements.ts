@@ -1,26 +1,26 @@
-import { useState, useEffect } from 'react';
-import { agreementsService } from '../services/agreements.service';
-import type { Agreement } from '@selo/types';
+import { useState, useCallback } from 'react';
+import { agreementsService, ListAgreementsParams } from '../services/agreements.service';
+import type { AgreementListItem } from '../types/api';
 
-export function useAgreements() {
-  const [agreements, setAgreements] = useState<Agreement[]>([]);
+export function useAgreements(defaultParams?: ListAgreementsParams) {
+  const [agreements, setAgreements] = useState<AgreementListItem[]>([]);
+  const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const load = async () => {
+  const load = useCallback(async (params?: ListAgreementsParams) => {
     setLoading(true);
     setError(null);
     try {
-      const res = await agreementsService.list();
+      const res = await agreementsService.list({ ...defaultParams, ...params });
       setAgreements(res.data);
+      setTotal(res.total);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Erro ao carregar combinados');
     } finally {
       setLoading(false);
     }
-  };
+  }, [defaultParams]);
 
-  useEffect(() => { load(); }, []);
-
-  return { agreements, loading, error, refresh: load };
+  return { agreements, total, loading, error, refresh: load };
 }

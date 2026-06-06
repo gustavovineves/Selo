@@ -19,18 +19,21 @@ export function useAuth() {
     }
   }, []);
 
-  const register = useCallback(async (data: { email: string; password: string; fullName: string; phone?: string }) => {
-    setLoading(true);
-    setError(null);
-    try {
-      await authService.register(data);
-      router.replace('/(app)/home');
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Erro ao criar conta');
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const register = useCallback(
+    async (data: { email: string; password: string; firstName: string; lastName?: string }) => {
+      setLoading(true);
+      setError(null);
+      try {
+        await authService.register(data);
+        router.replace('/(app)/home');
+      } catch (e) {
+        setError(e instanceof Error ? e.message : 'Erro ao criar conta');
+      } finally {
+        setLoading(false);
+      }
+    },
+    [],
+  );
 
   const logout = useCallback(async () => {
     await authService.logout();
