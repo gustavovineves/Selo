@@ -25,6 +25,14 @@ export default function RootLayout() {
             headerTintColor: '#ffffff',
           }}
         />
+        <Stack.Screen
+          name="edit-profile"
+          options={{
+            title: 'Editar perfil',
+            headerStyle: { backgroundColor: '#1E1B4B' },
+            headerTintColor: '#ffffff',
+          }}
+        />
       </Stack>
     </SafeAreaProvider>
   );

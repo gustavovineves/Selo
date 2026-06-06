@@ -333,3 +333,50 @@ Write-Host "Snapshot original mantido: $($acordoAtualizado.receiverDestinationSn
 - `apps/api/src/modules/receiving-destinations/dto/update-receiving-destination.dto.ts` — criado
 - `apps/api/src/modules/agreements/agreements.service.ts` — `createGuaranteed` atualizado com verificação e snapshot
 - `apps/api/src/modules/agreements/agreements.module.ts` — importa `ReceivingDestinationsModule`
+
+---
+
+## Destino de Recebimento no App Mobile (Fase 12)
+
+### Serviços mobile (já existiam na Fase 9, utilizados na Fase 12)
+
+```typescript
+// receiving-destinations.service.ts
+getMe()                            → GET  /receiving-destinations/me
+create(payload)                    → POST /receiving-destinations
+update(id, { label, isDefault })   → PATCH /receiving-destinations/:id
+remove(id)                         → DELETE /receiving-destinations/:id
+```
+
+### UX no app
+
+- **Lista**: cada destino exibe tipo (badge colorido), `maskedValue`, label e badge "Padrão"
+- **Definir padrão**: botão "Definir padrão" por destino → `PATCH /:id { isDefault: true }`
+- **Editar**: expande formulário inline com campo label + toggle isDefault → `PATCH /:id`
+- **Excluir**: confirmação → `DELETE /:id` → 409 se há pendências → mensagem amigável: "Este destino não pode ser excluído porque ainda está vinculado a acordos ou valores pendentes."
+- **Adicionar**: formulário inline com:
+  - Seletor de tipo (chips: CPF, E-mail, Telefone, Aleatória)
+  - Campo "Valor da chave" com placeholder contextual por tipo
+  - Campo "Apelido" (opcional)
+  - Toggle "Definir como padrão"
+  - Nota de dev: "Ambiente de desenvolvimento: destino simulado."
+
+### Terminologia no app
+
+| Técnico | App |
+|---|---|
+| `ReceivingDestination` | Destino de Recebimento |
+| `pixKey` | valor da chave (nunca exibido — apenas `maskedValue`) |
+| `PIX_CPF` | CPF |
+| `PIX_EMAIL` | E-mail |
+| `PIX_PHONE` | Telefone |
+| `PIX_RANDOM` | Aleatória |
+| `isDefault` | Padrão |
+
+### Limitações no app (MVP)
+
+- `pixKey` não é validado com o Banco Central — qualquer valor é aceito em dev
+- Não há criptografia de campo para o `pixKey` armazenado
+- Não é possível alterar `type` ou `pixKey` via `PATCH` — apenas `label` e `isDefault`
+- Para trocar a chave Pix de um destino, o usuário deve cadastrar um novo e excluir o antigo
+- O aviso "Para trocar o destino, cadastre um novo e defina como padrão" é exibido no formulário de edição

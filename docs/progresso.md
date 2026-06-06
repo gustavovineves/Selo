@@ -1,6 +1,6 @@
 # Progresso do Projeto Selo
 
-Última atualização: 2026-06-06 (Fase 11 — Garantia, Pix Simulado e Contestação Formal no Mobile)
+Última atualização: 2026-06-06 (Fase 12 — Perfil, Chave de Recebimento e Destino de Recebimento no Mobile)
 
 ---
 
@@ -40,6 +40,7 @@
 | App Mobile (shell + home wallet) | ✅ Implementado (Fase 9) |
 | App Mobile (criação de acordos + detalhe) | ✅ Implementado (Fase 10) |
 | App Mobile (Pix simulado + contestação formal) | ✅ Implementado (Fase 11) |
+| App Mobile (Perfil, Chave, Destino de Recebimento) | ✅ Implementado (Fase 12) |
 | Score de Confiança | ✅ recordEvent implementado (Fase 5 e 6) |
 | Git local | ✅ Limpo após commit da Fase 4 |
 
@@ -574,38 +575,103 @@ Usa `events: { none: { actorId: userId, type: CONFIRMED } }` para detectar exata
 
 ---
 
+## 5h. Fase 12 — Perfil, Chave de Recebimento e Destino de Recebimento no Mobile (Implementada)
+
+### O que foi implementado
+
+- **Tela de Perfil reescrita**: hub completo com avatar, score colorido, texto explicativo, seções bem separadas
+- **Edição de perfil**: nova tela `edit-profile` com campos nome, sobrenome, nome exibido, bio → `PATCH /users/me/profile`
+- **Gerenciamento da Chave de Recebimento**:
+  - Exibição da chave ativa com botões Copiar, Compartilhar e Excluir
+  - Formulário inline de criação: handle input + verificação de disponibilidade (`GET /check/:key`) + criação
+  - Confirmação antes da exclusão; mensagem de erro se há pendências bloqueando
+- **Gerenciamento de Destinos de Recebimento**:
+  - Lista com tipo, masked value, label, badge "Padrão" por destino
+  - Ações por item: "Definir padrão", "Editar" (label + toggle isDefault inline), "Excluir"
+  - Formulário de novo destino: type picker em chips (CPF/Email/Telefone/Aleatória), pixKey, label, isDefault toggle
+  - Nota de ambiente de desenvolvimento visível em amarelo
+  - Confirmação antes da exclusão; mensagem amigável para 409 (vinculado a acordos)
+- **Tratamento de erros**: `mapError()` com mensagens amigáveis por cenário; redirecionamento para login em 401
+- **Logout**: "Sair da conta" com confirmação, limpa tokens, redireciona para login
+
+### Arquivos criados
+
+| Arquivo | Descrição |
+|---|---|
+| `apps/mobile/src/services/users.service.ts` | `updateProfile(payload)` → `PATCH /users/me/profile` |
+| `apps/mobile/app/edit-profile.tsx` | Tela de edição de perfil básico |
+
+### Arquivos alterados
+
+| Arquivo | O que mudou |
+|---|---|
+| `apps/mobile/src/services/receiving-keys.service.ts` | Adicionado `deleteMe()` |
+| `apps/mobile/app/(app)/profile.tsx` | Reescrita completa — hub de perfil, chave e destinos |
+| `apps/mobile/app/_layout.tsx` | Adicionado `edit-profile` no Stack |
+
+### Endpoints consumidos
+
+| Método | Rota | Tela |
+|---|---|---|
+| GET | `/api/v1/auth/me` | Perfil + edit-profile |
+| PATCH | `/api/v1/users/me/profile` | edit-profile |
+| GET | `/api/v1/receiving-keys/me` | Perfil |
+| POST | `/api/v1/receiving-keys` | Formulário de criação de chave |
+| GET | `/api/v1/receiving-keys/check/:key` | Verificação de disponibilidade |
+| DELETE | `/api/v1/receiving-keys/me` | Exclusão de chave |
+| GET | `/api/v1/receiving-destinations/me` | Perfil |
+| POST | `/api/v1/receiving-destinations` | Formulário de novo destino |
+| PATCH | `/api/v1/receiving-destinations/:id` | Edit inline de destino |
+| DELETE | `/api/v1/receiving-destinations/:id` | Exclusão de destino |
+
+### Decisões desta fase
+
+- **Tela de perfil como hub único**: gerenciamento de chave e destino é feito inline na própria tela (sem sub-screens adicionais para essas ações). Apenas edição de perfil usa tela separada (campos múltiplos).
+- **`check` antes de criar**: formulário de chave sugere verificar disponibilidade antes de criar, mas não bloqueia — o backend retorna erro claro se o handle já existir.
+- **Clipboard**: em vez de `expo-clipboard` (dependência nova), usa `Alert.alert` para exibir o handle completo (usuário copia manualmente). Para compartilhar, usa `Share.share` nativo — sem nova dependência.
+- **Inline edit de destino**: o formulário de edição expande na própria linha do destino via estado local — sem Modal, sem navegação.
+- **Tipo de chave**: `deleteMe()` chama `DELETE /receiving-keys/me` (o backend usa soft delete — `status: DELETED`).
+- **Sem migration**: nenhuma alteração no schema Prisma.
+- **Sem commit**: conforme instrução.
+- **Fitbank não integrado**: Pix continua simulado; nenhum dinheiro real movimentado.
+
+### Validação
+
+- `pnpm --filter @selo/mobile typecheck` → ✅ limpo
+- `pnpm --filter @selo/api build` → ✅ limpo, sem regressão
+
+---
+
 ## 6. O Que NÃO Foi Implementado Ainda
 
 Os módulos abaixo existem como stubs (`NotImplementedException`) ou aguardam as fases futuras:
 
 | Funcionalidade | Fase | Módulo |
 |---|---|---|
-| Integração real Fitbank/BaaS | Fase 12 | `pix` + `payments` |
-| Webhook real do PSP | Fase 12 | `pix` |
-| Blockchain (submissão real) | Fase 12 | `blockchain-records` |
-| Painel Admin funcional (Next.js) | Fase 12 | `apps/admin` |
-| Notificações push | Fase 12 | `notifications` |
-| Auth admin real (AdminUser + JWT) | Fase 12 | `admin` |
-| Reembolso pelo app mobile (botão refund) | Fase 12 | `apps/mobile` |
-| Refresh automático do JWT (401 → refresh) | Fase 12 | `apps/mobile` |
-| Edição de perfil, avatar, chave, destino pelo app | Fase 12 | `apps/mobile` |
-| Upload de arquivo como evidência de contestação | Fase 12 | `apps/mobile` |
+| Integração real Fitbank/BaaS | Fase 13 | `pix` + `payments` |
+| Webhook real do PSP | Fase 13 | `pix` |
+| Blockchain (submissão real) | Fase 13 | `blockchain-records` |
+| Painel Admin funcional (Next.js) | Fase 13 | `apps/admin` |
+| Notificações push | Fase 13 | `notifications` |
+| Auth admin real (AdminUser + JWT) | Fase 13 | `admin` |
+| Reembolso pelo app mobile (botão refund) | Fase 13 | `apps/mobile` |
+| Refresh automático do JWT (401 → refresh) | Fase 13 | `apps/mobile` |
+| Upload de arquivo como evidência de contestação | Fase 13 | `apps/mobile` |
+| Upload de avatar | Fase 13 | `apps/mobile` |
 
 ---
 
 ## 7. Próxima Fase
 
-### Fase 12 — Reembolso, JWT Refresh e Edição de Perfil no Mobile
+### Fase 13 — Reembolso, JWT Refresh e Notificações Push
 
-Objetivo: completar o fluxo mobile com reembolso (botão refund), refresh automático do JWT e edição de perfil.
+Objetivo: completar o fluxo mobile com reembolso pelo app, refresh automático do JWT (401 → refresh → retry) e notificações push locais.
 
 O que implementar:
-- Botão "Reembolsar" no app para acordos `ACTIVE + FUNDS_HELD`
-- Interceptor de 401 → `POST /auth/refresh` → retry automático
-- Edição de perfil: nome display, avatar
-- Gerenciamento de chave de recebimento pelo app (criar, excluir)
-- Gerenciamento de destino de recebimento pelo app (criar, excluir)
-- Notificações push locais (Expo Notifications)
+- Botão "Reembolsar" no app para acordos `ACTIVE + FUNDS_HELD` (chama `POST /agreements/:id/refund`)
+- Interceptor de 401 → `POST /auth/refresh` → retry automático (no `api.ts`)
+- Notificações push locais (Expo Notifications) para eventos de acordo
+- Upload de avatar de perfil
 
 Não implementar ainda: Fitbank real, blockchain real, painel admin funcional, KYC.
 

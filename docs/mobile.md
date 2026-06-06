@@ -420,3 +420,109 @@ O token JWT é armazenado via `expo-secure-store`. Para testes:
 | `apps/mobile/app/agreement/[id].tsx` | Criado (detalhe + ações contextuais) |
 | `apps/mobile/app/(app)/create.tsx` | Atualizado (navega para wizard, remove Alert placeholder) |
 | `apps/mobile/app/_layout.tsx` | Atualizado (registra `create-agreement` e `agreement/[id]` no Stack) |
+
+---
+
+## Fase 12 — Perfil, Chave de Recebimento e Destino de Recebimento (Implementado)
+
+### Telas criadas/alteradas
+
+| Tela | Arquivo | O que mudou |
+|---|---|---|
+| Perfil completo | `app/(app)/profile.tsx` | Reescrita completa — hub de gerenciamento de perfil, chave e destinos |
+| Editar perfil | `app/edit-profile.tsx` | Nova tela — formulário completo de edição de dados básicos |
+
+### Novos serviços
+
+| Serviço | Arquivo | Métodos |
+|---|---|---|
+| `usersService` | `src/services/users.service.ts` | `updateProfile(payload)` → `PATCH /users/me/profile` |
+
+### Métodos adicionados a serviços existentes
+
+| Serviço | Método | Endpoint |
+|---|---|---|
+| `receivingKeysService` | `deleteMe()` | `DELETE /receiving-keys/me` |
+
+### Tela Perfil — seções
+
+| Seção | O que exibe |
+|---|---|
+| Avatar + header | Avatar com iniciais, nome exibido, e-mail, cidade, badge de score, botão "Editar" |
+| Score de confiança | Pontuação, nível colorido, texto explicativo humano |
+| Minha Chave de Recebimento | Chave ativa com copy/share/excluir; ou formulário de criação com verificação de disponibilidade |
+| Destino de Recebimento | Lista mascarada com edit inline/delete; formulário de cadastro de novo destino |
+| Conta | "Editar perfil" (→ edit-profile) + "Sair da conta" |
+
+### Tela Editar Perfil — campos
+
+| Campo | Backend | Observação |
+|---|---|---|
+| Nome | `firstName` | Obrigatório |
+| Sobrenome | `lastName` | Opcional |
+| Nome exibido | `displayName` | Aparece como nome principal se preenchido |
+| Bio | `bio` | Linha sobre o usuário |
+
+> Cidade, estado, país não são editáveis via `PATCH /users/me/profile` (não estão no DTO do backend).
+
+### Fluxo de Chave de Recebimento no app
+
+1. Se chave ativa: exibe `@handle`, status, botões Copiar / Compartilhar / Excluir
+2. Copiar → `Alert.alert` com o handle para o usuário copiar manualmente
+3. Compartilhar → `Share.share` nativo
+4. Excluir → confirmação via `Alert.alert` → `DELETE /receiving-keys/me` → reload
+5. Se não tem chave: estado vazio + "Criar minha chave" → formulário inline
+6. Formulário: input de handle (só letras/números/ponto/underline/hífen), botão "Verificar" → `GET /receiving-keys/check/:key` → indica disponível/indisponível
+7. Criar → `POST /receiving-keys` → reload
+
+### Fluxo de Destino de Recebimento no app
+
+1. Lista destinos (tipo badge, masked, label, badge "Padrão")
+2. Por destino: [Definir padrão] [Editar] [Excluir]
+3. "Editar" → formulário inline com campo label + toggle isDefault → `PATCH /receiving-destinations/:id`
+4. "Excluir" → confirmação → `DELETE /receiving-destinations/:id` → 409 se há pendências → mensagem amigável
+5. "Adicionar destino" → formulário inline com type picker (chips), pixKey, label, isDefault toggle
+6. Criação → `POST /receiving-destinations` → reload
+
+### Endpoints consumidos (Fase 12)
+
+| Método | Rota | Onde |
+|---|---|---|
+| GET | `/api/v1/auth/me` | Perfil (via useProfile) e edit-profile (load inicial) |
+| PATCH | `/api/v1/users/me/profile` | Tela "Editar perfil" |
+| GET | `/api/v1/receiving-keys/me` | Perfil (via useProfile) |
+| POST | `/api/v1/receiving-keys` | Formulário de criação de chave |
+| GET | `/api/v1/receiving-keys/check/:key` | Verificação de disponibilidade |
+| DELETE | `/api/v1/receiving-keys/me` | Botão "Excluir" na chave |
+| GET | `/api/v1/receiving-destinations/me` | Perfil (via useProfile) |
+| POST | `/api/v1/receiving-destinations` | Formulário de novo destino |
+| PATCH | `/api/v1/receiving-destinations/:id` | Edit inline de destino |
+| DELETE | `/api/v1/receiving-destinations/:id` | Exclusão de destino |
+
+### Terminologia no app (Fase 12)
+
+| Técnico/Backend | App para o usuário |
+|---|---|
+| `ReceivingKey` | Chave de Recebimento |
+| `handle` | chave (no contexto da Chave de Recebimento) |
+| `ReceivingDestination` | Destino de Recebimento |
+| `pixKey` | valor da chave (nunca exposto ao usuário — só `maskedValue`) |
+| `PIX_CPF` | CPF |
+| `PIX_EMAIL` | E-mail |
+| `PIX_PHONE` | Telefone |
+| `PIX_RANDOM` | Aleatória |
+| `isDefault` | Padrão |
+
+> A Chave de Recebimento **não é chave Pix**. Serve para localizar o usuário dentro do app.
+> O Destino de Recebimento é simulado em dev. Nenhum dado é validado com o Banco Central. Nenhum dinheiro real é movimentado.
+
+### Limitações desta fase (Fase 12)
+
+| Limitação | Quando resolve |
+|---|---|
+| Refresh automático do JWT (401 → refresh → retry) | Fase 13 |
+| Upload de avatar | Fase 13 |
+| Notificações push | Fase 13 |
+| Botão "Reembolsar" no app | Fase 13 |
+| Validação de pixKey com o Banco Central | Produção (Fitbank) |
+| Criptografia do pixKey em armazenamento | Produção (KMS) |
