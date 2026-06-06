@@ -13,7 +13,12 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { StepHeader, ReceiverPreviewCard, PrimaryButton } from '../src/components';
+import {
+  StepHeader,
+  ReceiverPreviewCard,
+  PrimaryButton,
+  DueDatePicker,
+} from '../src/components';
 import { receivingKeysService } from '../src/services/receiving-keys.service';
 import { agreementsService } from '../src/services/agreements.service';
 import { Colors, Spacing, Radii, FontSize, FontWeight, Shadow } from '../src/theme';
@@ -71,33 +76,31 @@ const STEP_LABELS = [
   'Para quem é este combinado?',
   'Sobre o combinado',
   'Valor',
-  'Prazo',
+  'Prazo e horário',
   'Revise e confirme',
 ];
 
-function parseDateInput(input: string): string | undefined {
-  const trimmed = input.trim();
-  if (!trimmed) return undefined;
-  const parts = trimmed.split('/');
-  if (parts.length !== 3) return undefined;
-  const [d, m, y] = parts.map((p) => parseInt(p, 10));
-  if (isNaN(d) || isNaN(m) || isNaN(y)) return undefined;
-  if (y < 2024 || y > 2035 || m < 1 || m > 12 || d < 1 || d > 31) return undefined;
-  const date = new Date(y, m - 1, d, 23, 59, 59);
-  if (isNaN(date.getTime())) return undefined;
-  return date.toISOString();
+function defaultDate(daysFromNow: number): Date {
+  const d = new Date();
+  d.setDate(d.getDate() + daysFromNow);
+  return d;
 }
 
-function formatDateForDisplay(iso: string | null | undefined): string {
-  if (!iso) return '';
-  const d = new Date(iso);
+function formatDateOnly(d: Date): string {
   return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
 }
 
-function quickDate(daysFromNow: number): string {
-  const d = new Date();
-  d.setDate(d.getDate() + daysFromNow);
-  d.setHours(23, 59, 59, 0);
+function formatDateWithTime(iso: string | null | undefined): string {
+  if (!iso) return '';
+  const d = new Date(iso);
+  const date = `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
+  const time = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+  return `${date} às ${time}`;
+}
+
+function buildFinalDueDate(date: Date, hour: number, minute: number): string {
+  const d = new Date(date);
+  d.setHours(hour, minute, 0, 0);
   return d.toISOString();
 }
 
@@ -114,7 +117,7 @@ function buildSummaryText(
     !isNaN(amtNum) && amtNum > 0
       ? `R$ ${amtNum.toFixed(2).replace('.', ',')}`
       : null;
-  const dateStr = dueDateIso ? formatDateForDisplay(dueDateIso) : null;
+  const dateStr = dueDateIso ? formatDateWithTime(dueDateIso) : null;
   const datePart = dateStr ? ` até ${dateStr}` : '';
 
   switch (kind) {
@@ -158,10 +161,10 @@ export default function CreateAgreementScreen() {
   // Step 2 — amount
   const [amountStr, setAmountStr] = useState('');
 
-  // Step 3 — due date
-  const [dateMode, setDateMode] = useState<'7' | '30' | 'custom'>('7');
-  const [customDateInput, setCustomDateInput] = useState('');
-  const [dateIso, setDateIso] = useState<string | undefined>(undefined);
+  // Step 3 — due date + time
+  const [selectedDate, setSelectedDate] = useState<Date | null>(() => defaultDate(7));
+  const [selectedHour, setSelectedHour] = useState(18);
+  const [selectedMinute, setSelectedMinute] = useState(0);
 
   // errors
   const [stepError, setStepError] = useState<string | null>(null);
@@ -244,17 +247,13 @@ export default function CreateAgreementScreen() {
     }
 
     if (step === 3) {
-      if (dateMode === 'custom') {
-        const parsed = parseDateInput(customDateInput);
-        if (!parsed) {
-          setStepError('Data inválida. Use o formato DD/MM/AAAA.');
-          return;
-        }
-        setDateIso(parsed);
+      if (!selectedDate) {
+        setStepError('Escolha o dia do prazo para continuar.');
+        return;
       }
-      const finalDate = dateMode === 'custom' ? dateIso : quickDate(parseInt(dateMode));
-      if (!finalDate) {
-        setStepError('Informe o prazo do combinado.');
+      const dueDate = buildFinalDueDate(selectedDate, selectedHour, selectedMinute);
+      if (new Date(dueDate) <= new Date()) {
+        setStepError('O prazo precisa ser uma data e horário no futuro.');
         return;
       }
     }
@@ -274,11 +273,9 @@ export default function CreateAgreementScreen() {
     const amtNum = parseFloat(amountStr.replace(',', '.'));
     const amount = !isNaN(amtNum) && amtNum > 0 ? amtNum : undefined;
 
-    const finalDueDate = (() => {
-      if (dateMode === '7') return quickDate(7);
-      if (dateMode === '30') return quickDate(30);
-      return dateIso;
-    })();
+    const finalDueDate = selectedDate
+      ? buildFinalDueDate(selectedDate, selectedHour, selectedMinute)
+      : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
 
     try {
       let agreement: AgreementDetail;
@@ -328,11 +325,9 @@ export default function CreateAgreementScreen() {
   }
 
   const isLastStep = step === TOTAL_STEPS - 1;
-  const finalDueIso = (() => {
-    if (dateMode === '7') return quickDate(7);
-    if (dateMode === '30') return quickDate(30);
-    return dateIso;
-  })();
+  const finalDueIso = selectedDate
+    ? buildFinalDueDate(selectedDate, selectedHour, selectedMinute)
+    : undefined;
 
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
@@ -409,14 +404,15 @@ export default function CreateAgreementScreen() {
           )}
 
           {step === 3 && (
-            <StepDate
-              dateMode={dateMode}
-              onDateModeChange={(mode: '7' | '30' | 'custom') => {
-                setDateMode(mode);
-                if (mode !== 'custom') setCustomDateInput('');
+            <DueDatePicker
+              selectedDate={selectedDate}
+              selectedHour={selectedHour}
+              selectedMinute={selectedMinute}
+              onDateChange={setSelectedDate}
+              onTimeChange={(h, m) => {
+                setSelectedHour(h);
+                setSelectedMinute(m);
               }}
-              customDateInput={customDateInput}
-              onCustomDateChange={setCustomDateInput}
             />
           )}
 
@@ -624,69 +620,6 @@ function StepAmount({
   );
 }
 
-const DATE_OPTIONS = [
-  { label: '7 dias', mode: '7' as const },
-  { label: '30 dias', mode: '30' as const },
-  { label: 'Personalizado', mode: 'custom' as const },
-];
-
-function StepDate({
-  dateMode,
-  onDateModeChange,
-  customDateInput,
-  onCustomDateChange,
-}: {
-  dateMode: '7' | '30' | 'custom';
-  onDateModeChange: (mode: '7' | '30' | 'custom') => void;
-  customDateInput: string;
-  onCustomDateChange: (v: string) => void;
-}) {
-  return (
-    <View>
-      <Text style={styles.label}>Prazo do combinado *</Text>
-      <Text style={styles.hint}>Todo combinado precisa ter prazo. Escolha uma opção ou defina uma data personalizada.</Text>
-
-      <View style={styles.dateChips}>
-        {DATE_OPTIONS.map((opt) => (
-          <TouchableOpacity
-            key={opt.mode}
-            style={[styles.dateChip, dateMode === opt.mode && styles.dateChipActive]}
-            onPress={() => onDateModeChange(opt.mode)}
-          >
-            <Text
-              style={[styles.dateChipText, dateMode === opt.mode && styles.dateChipTextActive]}
-            >
-              {opt.label}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-
-      {dateMode === 'custom' && (
-        <View style={{ marginTop: Spacing.md }}>
-          <TextInput
-            style={styles.input}
-            placeholder="DD/MM/AAAA"
-            value={customDateInput}
-            onChangeText={onCustomDateChange}
-            keyboardType="numeric"
-            maxLength={10}
-          />
-        </View>
-      )}
-
-      {dateMode !== 'custom' && (
-        <View style={styles.datePrev}>
-          <Ionicons name="calendar-outline" size={16} color={Colors.textSecondary} />
-          <Text style={styles.datePrevText}>
-            {formatDateForDisplay(quickDate(parseInt(dateMode)))}
-          </Text>
-        </View>
-      )}
-    </View>
-  );
-}
-
 function StepSummary({
   kind,
   config,
@@ -732,7 +665,7 @@ function StepSummary({
           <SummaryRow
             icon="calendar-outline"
             label="Prazo"
-            value={formatDateForDisplay(dueDateIso)}
+            value={formatDateWithTime(dueDateIso)}
           />
         )}
         {description && (
@@ -749,6 +682,7 @@ function StepSummary({
         <View style={styles.guaranteeDisclaimer}>
           <Ionicons name="shield-outline" size={18} color={Colors.primary} />
           <Text style={styles.guaranteeDisclaimerText}>
+            Você paga com Pix. O valor fica protegido até o acordo ser concluído.{'\n'}
             Após criar, a outra parte precisa aceitar. Depois, você inicia o depósito Pix do valor protegido.
           </Text>
         </View>
@@ -811,7 +745,7 @@ function SuccessScreen({
           )}
           {agreement.dueDate && (
             <Text style={styles.successCardDate}>
-              Prazo: {formatDateForDisplay(agreement.dueDate)}
+              Prazo: {formatDateWithTime(agreement.dueDate)}
             </Text>
           )}
         </View>
@@ -983,50 +917,6 @@ const styles = StyleSheet.create({
     fontSize: FontSize.sm,
     color: Colors.primary,
     lineHeight: 20,
-  },
-  dateChips: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: Spacing.sm,
-    marginBottom: Spacing.sm,
-  },
-  dateChip: {
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
-    borderRadius: Radii.full,
-    backgroundColor: Colors.bgCard,
-    borderWidth: 1.5,
-    borderColor: Colors.border,
-    ...Shadow.sm,
-  },
-  dateChipActive: {
-    backgroundColor: Colors.primaryGlow,
-    borderColor: Colors.primary,
-  },
-  dateChipText: {
-    fontSize: FontSize.sm,
-    color: Colors.textSecondary,
-    fontWeight: FontWeight.medium,
-  },
-  dateChipTextActive: {
-    color: Colors.primary,
-    fontWeight: FontWeight.semibold,
-  },
-  datePrev: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.xs,
-    marginTop: Spacing.sm,
-    padding: Spacing.md,
-    backgroundColor: Colors.bgCard,
-    borderRadius: Radii.md,
-    borderWidth: 1,
-    borderColor: Colors.borderLight,
-  },
-  datePrevText: {
-    fontSize: FontSize.sm,
-    color: Colors.textSecondary,
-    fontWeight: FontWeight.medium,
   },
   summaryCard: {
     backgroundColor: Colors.primaryGlow,

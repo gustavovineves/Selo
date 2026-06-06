@@ -1,10 +1,10 @@
-# Testes Automatizados — Selo API (Fase 18)
+# Testes Automatizados — Selo API (Fase 18/19)
 
 ## Objetivo
 
 Proteger o núcleo do MVP com testes unitários automatizados (Fase 16/17) e provar que o fluxo completo do MVP funciona de ponta a ponta com banco de dados real (Fase 18 — testes E2E com PostgreSQL local).
 
-Esta fase não implementou Fitbank real, Pix real, blockchain real, KYC, chat, push notifications reais, alterações de regras financeiras, migration nova ou commit.
+Fase 18 implementou os testes E2E. Fase 19 (polimento UX do prazo mobile) não alterou nenhum teste — os 238 testes continuam passando sem modificação.
 
 ---
 

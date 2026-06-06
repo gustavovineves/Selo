@@ -766,45 +766,134 @@ Criar uma central de notificações dentro do app para avisar o usuário sobre e
 
 ## Fase 18 — Auditoria do Prazo Visual e Mudanças no Picker de Data
 
-### Estado atual (pós Fase 18)
+### Estado após Fase 18 (histórico)
 
-O fluxo de criação de acordos usa **chips de seleção rápida** para o prazo:
+A opção "Sem prazo" foi **removida** na Fase 18, porque `dueDate` agora é obrigatório no backend. O picker existia apenas como chips de seleção rápida (7d / 30d / Personalizado DD/MM/AAAA). O horário era definido automaticamente como `23:59:59` sem exposição ao usuário.
 
-- **7 dias** (padrão inicial)
-- **30 dias**
-- **Personalizado** — input de texto DD/MM/AAAA
+---
 
-A opção "Sem prazo" foi **removida** na Fase 18, porque `dueDate` agora é obrigatório no backend (enforçado pelo DTO com `@IsDateString()` sem `@IsOptional()`).
+## Fase 19 — Polimento UX Mobile de Prazo: Date Picker + Time Wheel (Implementada)
 
-### O que permite hoje
+### Objetivo
+
+Substituir a etapa de prazo por uma experiência visual moderna: seleção de dia por chips + data personalizada, e seleção de horário por scroll wheel com intervalos de 30 minutos.
+
+### Novos componentes
+
+| Componente | Arquivo | Descrição |
+|---|---|---|
+| `TimeWheelPicker` | `src/components/TimeWheelPicker.tsx` | Scroll wheel de horário (00:00–23:30, 48 slots, snap cada 30min) |
+| `DueDatePicker` | `src/components/DueDatePicker.tsx` | Picker combinado de dia + horário; chips rápidos + data manual + TimeWheelPicker embutido |
+
+### Como funciona a seleção de prazo (Fase 19)
+
+#### Seleção de dia
+
+O usuário escolhe entre quatro chips rápidos:
+
+| Chip | Data |
+|---|---|
+| Hoje | data atual |
+| Amanhã | +1 dia |
+| 7 dias | +7 dias |
+| 30 dias | +30 dias |
+
+Ou toca em **"Outra data"** para digitar manualmente no formato `DD/MM/AAAA`.
+
+O chip ativo fica destacado (roxo) com a data curta embaixo (ex: `25/06`). Ao selecionar qualquer dia, um preview da data completa aparece imediatamente: `25/06/2026`.
+
+#### Seleção de horário
+
+Abaixo da seleção de data, o `TimeWheelPicker` exibe 48 slots de 30 em 30 minutos:
+
+```
+...
+17:00
+17:30
+► 18:00  ← selecionado (roxo, maior, bordas de seleção)
+18:30
+19:00
+...
+```
+
+O usuário rola verticalmente e o scroll trava (snap) a cada 30 minutos. O slot central é sempre o selecionado. Tocar diretamente num slot também o seleciona (e o scroll anima até lá).
+
+- Padrão inicial: **18:00**
+- Intervalo: 30 minutos
+- Total de slots: 48 (00:00 a 23:30)
+
+#### Preview final
+
+Abaixo do time wheel, o componente exibe um card de confirmação:
+
+```
+⏱ Prazo: 25/06/2026 às 18:00
+```
+
+#### Construção do `dueDate`
+
+```typescript
+function buildFinalDueDate(date: Date, hour: number, minute: number): string {
+  const d = new Date(date);
+  d.setHours(hour, minute, 0, 0);
+  return d.toISOString();
+}
+```
+
+O dueDate é sempre montado com o dia escolhido pelo usuário + hora + minuto do time wheel.
+
+### Etapa no wizard de criação
+
+- **Etapa 4** passou a se chamar "Prazo e horário" (era "Prazo")
+- Validação: data obrigatória + prazo não pode estar no passado
+- Se o usuário não escolheu uma data, ao tentar avançar aparece: "Escolha o dia do prazo para continuar."
+- Se a data/hora já passou: "O prazo precisa ser uma data e horário no futuro."
+- Padrão inicial: **7 dias a partir de hoje + 18:00** — o usuário já chega na etapa com um prazo válido
+
+### Resumo e tela de sucesso
+
+O prazo agora é exibido com data e hora em toda a UI:
+
+```
+Prazo: 25/06/2026 às 18:00
+```
+
+Afeta:
+- Etapa de resumo (Step 4 → linha "Prazo")
+- Frase em linguagem humana no card de resumo (`buildSummaryText`)
+- Tela de sucesso após criar o acordo
+
+### O que NÃO foi implementado (limitações)
 
 | Item | Status |
 |---|---|
-| Selecionar dia (via chip 7d/30d ou DD/MM/AAAA) | ✅ |
-| Horário específico | ⚠️ Não exposto ao usuário — backend usa 23:59:59 local para 7d/30d, ou o ISO passado pelo cliente |
-| Date Picker Wheel visual (dia/mês/ano) | ❌ Não implementado |
-| Infinite Scroll Picker para horário | ❌ Não implementado |
+| Date Picker Wheel nativo (iOS-style, dia/mês/ano rotativo) | ⚠️ MVP: chips rápidos + campo DD/MM/AAAA. Wheel nativo exigiria `@react-native-picker/picker` ou equivalente |
+| Horário em intervalos de 15 min | ⚠️ Implementado em 30 min (48 slots). Mudar para 15 min = 96 slots, apenas alterar a constante |
+| Scroll infinito real (loop) no time wheel | ⚠️ O scroll não é circular/infinito — vai de 00:00 a 23:30 e para. Suficiente para o MVP |
+| Seleção de horário por teclado | ⚠️ Apenas scroll/tap. Sem input manual de hora |
 
-### Pendência de UX (Polimento Futuro)
+### Validações desta fase
 
-O alvo de UX para seleção de prazo é:
+| Comando | Resultado |
+|---|---|
+| `pnpm --filter @selo/mobile typecheck` | ✅ Exit 0 |
+| `pnpm --filter @selo/api test` | ✅ 155 testes, 10 suítes, 0 falhas |
+| `pnpm --filter @selo/api test:e2e` | ✅ 83 testes, 1 suíte, 0 falhas |
+| `pnpm --filter @selo/api build` | ✅ Exit 0 |
+| `pnpm --filter @selo/admin typecheck` | ✅ Exit 0 |
 
-- **Date Picker Wheel** — scrollable wheel para dia / mês / ano (similar ao iOS DatePicker nativo)
-- **Infinite Scroll Picker** — scrollable para horário (hora e minuto)
-- Sem formulário longo — seleção visual, intuitiva, com feedback imediato
+### Confirmações obrigatórias
 
-**Isso NÃO foi implementado na Fase 18.** A prioridade desta fase foi a validação E2E com banco real. O polimento visual do picker fica para uma fase futura de UX.
-
-### Como o horário é tratado hoje
-
-- Chips `7 dias` / `30 dias`: a função `quickDate()` define horário `23:59:59` local
-- Campo personalizado DD/MM/AAAA: também usa `23:59:59` local (via `parseDateInput()`)
-- O backend armazena e preserva o ISO completo com hora — já testado nos E2E da Fase 18
-
-### Impacto nos testes E2E
-
-Os testes E2E (Fase 18) validam que:
-- `dueDate` é obrigatório (DTO bloqueado sem dueDate)
-- Dia e horário são preservados no banco (comparando `getUTCHours()` e `getUTCMinutes()` before/after)
-- `receiverKeySnapshot.userId` correto preservado
-- `receiverDestinationSnapshot` preservado nos acordos com garantia
+| Restrição | Status |
+|---|---|
+| Schema Prisma alterado? | **Não** |
+| Migration nova? | **Não** |
+| Fitbank real? | **Não** |
+| Pix real? | **Não** |
+| Blockchain real? | **Não** |
+| KYC? | **Não** |
+| Push notifications reais? | **Não** |
+| Chat? | **Não** |
+| dueDate removido/tornado opcional? | **Não — continua obrigatório** |
+| Dinheiro real movimentado? | **Não** |
+| Commit feito? | **Não** |

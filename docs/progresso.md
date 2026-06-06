@@ -1,6 +1,6 @@
 # Progresso do Projeto Selo
 
-Última atualização: 2026-06-06 (Fase 18 — Testes E2E com PostgreSQL Real)
+Última atualização: 2026-06-06 (Fase 19 — Polimento UX Mobile de Prazo)
 
 ---
 
@@ -47,6 +47,7 @@
 | Testes Automatizados do MVP (142 testes unitários) | ✅ Implementado (Fase 16) |
 | Auth Admin Real (AdminUser + JWT separado, 155 testes) | ✅ Implementado (Fase 17) |
 | Testes E2E com PostgreSQL Real (83 testes E2E, 238 total) | ✅ Implementado (Fase 18) |
+| Polimento UX Mobile de Prazo (Date Picker + Time Wheel) | ✅ Implementado (Fase 19) |
 | Score de Confiança | ✅ recordEvent implementado (Fase 5 e 6) |
 | Git local | ✅ Limpo após commit da Fase 4 |
 
@@ -1065,9 +1066,75 @@ Provar que o fluxo completo do MVP funciona de ponta a ponta com banco de dados 
 
 ---
 
+---
+
+## 5n. Fase 19 — Polimento UX Mobile de Prazo (Implementada)
+
+### Objetivo
+
+Melhorar a etapa de prazo no wizard de criação de acordos: substituir o input DD/MM/AAAA por chips visuais de data rápida e adicionar um scroll wheel de horário para o usuário escolher hora e minuto explicitamente.
+
+### Arquivos criados
+
+| Arquivo | Descrição |
+|---|---|
+| `apps/mobile/src/components/TimeWheelPicker.tsx` | Scroll wheel de horário (48 slots, 30min, snap, seleção por toque ou scroll) |
+| `apps/mobile/src/components/DueDatePicker.tsx` | Picker combinado: chips de data rápida + campo manual + TimeWheelPicker + preview final |
+
+### Arquivos alterados
+
+| Arquivo | O que mudou |
+|---|---|
+| `apps/mobile/src/components/index.ts` | Exporta `DueDatePicker` e `TimeWheelPicker` |
+| `apps/mobile/app/create-agreement.tsx` | Etapa 3 usa `DueDatePicker`; estado substituído por `selectedDate/hour/minute`; resumo e sucesso exibem hora |
+| `docs/mobile.md` | Seção Fase 19 completa — componentes, funcionamento, limitações |
+| `docs/progresso.md` | Este arquivo |
+
+### Como funciona
+
+| Item | Comportamento |
+|---|---|
+| Chips de data rápida | Hoje / Amanhã / 7 dias / 30 dias; chip ativo fica roxo com data curta embaixo |
+| Data personalizada | Botão "Outra data" abre campo DD/MM/AAAA; o botão some se seleção rápida ativa |
+| Preview de data | Aparece ao selecionar qualquer dia: "25/06/2026" |
+| TimeWheelPicker | 48 slots de 30min (00:00–23:30); scroll com snap; item central = selecionado; toque anima |
+| Padrão inicial | 7 dias a partir de hoje + 18:00 |
+| Preview final | "Prazo: 25/06/2026 às 18:00" |
+| dueDate enviado | `new Date(selectedDate).setHours(hour, minute, 0, 0).toISOString()` |
+| Validação | Data obrigatória + prazo não pode ser passado |
+
+### Resultados
+
+| Comando | Resultado |
+|---|---|
+| `pnpm --filter @selo/mobile typecheck` | ✅ Exit 0 |
+| `pnpm --filter @selo/api test` | ✅ **155 testes, 10 suítes, 0 falhas** |
+| `pnpm --filter @selo/api test:e2e` | ✅ **83 testes, 1 suíte, 0 falhas** |
+| `pnpm --filter @selo/api build` | ✅ Exit 0 |
+| `pnpm --filter @selo/admin typecheck` | ✅ Exit 0 |
+
+### Confirmações obrigatórias
+
+| Restrição | Status |
+|---|---|
+| Schema Prisma alterado? | **Não** |
+| Migration nova? | **Não** |
+| Fitbank real? | **Não** |
+| Pix real? | **Não** |
+| Blockchain real? | **Não** |
+| KYC? | **Não** |
+| Push notifications reais? | **Não** |
+| Chat? | **Não** |
+| dueDate tornado opcional? | **Não — continua obrigatório** |
+| Regra financeira alterada? | **Não** |
+| Dinheiro real movimentado? | **Não** |
+| Commit feito? | **Não** |
+
+---
+
 ## 7. Próxima Fase
 
-Fase 19 sugerida: upload de avatar no mobile, push notifications reais (Expo Notifications), integração Fitbank, ou CI automatizado (GitHub Actions para rodar unitários + E2E).
+Fase 20 sugerida: upload de avatar no mobile, push notifications reais (Expo Notifications), integração Fitbank, CI automatizado (GitHub Actions), ou seleção de horário por teclado no time picker.
 
 Não implementar sem instrução explícita: Fitbank real, blockchain real, KYC, push notifications reais.
 
