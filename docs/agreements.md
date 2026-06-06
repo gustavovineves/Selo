@@ -372,12 +372,24 @@ Versão no summary (aproximada, sem subquery de eventos):
 
 ---
 
+## Destino de Recebimento e Acordo com Garantia
+
+Ao criar `POST /api/v1/agreements/guaranteed`, o backend verifica se o **recebedor** (localizado via `counterpartyKey`) possui um **Destino de Recebimento** ativo cadastrado.
+
+- Se não tiver: `400 "O recebedor precisa configurar um destino de recebimento antes de receber valor protegido."`
+- Se tiver: um `receiverDestinationSnapshot` é salvo imutavelmente no acordo.
+
+Ver [docs/receiving-destinations.md](receiving-destinations.md) para conceito, endpoints e exemplos.
+
+---
+
 ## Limitações conhecidas
 
 - **`summary.totals.pendingMyAction`** inclui usuários que já confirmaram conclusão mas ainda esperam a outra parte. É uma aproximação. Para contagem precisa use `GET /agreements?pendingMyAction=true` + `count`.
 - **Filtros `hasGuarantee` e `type` não se sobrepõem**: se ambos forem fornecidos, `type` prevalece.
 - **`financial.amountsToReceive` e `amountsToPay` são em BRL apenas** — somatório por `currency` será implementado quando múltiplas moedas forem suportadas.
 - **Pix e Fitbank continuam simulados** — nenhuma movimentação financeira real ocorre.
+- **Destino de recebimento obrigatório para acordos com garantia** — o recebedor deve ter destino ativo antes de poder ser criador/alvo de um acordo garantido.
 
 ---
 

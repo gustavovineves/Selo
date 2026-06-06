@@ -1,6 +1,6 @@
 # Progresso do Projeto Selo
 
-Última atualização: 2026-06-05 (Fase 7 — home/wallet/listagens implementadas)
+Última atualização: 2026-06-05 (Fase 8 — destino de recebimento implementado)
 
 ---
 
@@ -36,6 +36,7 @@
 | Disputas básicas | ✅ Implementado (Fase 5) |
 | Resolução admin de disputas | ✅ Implementado (Fase 6) |
 | Home/Wallet/Listagens | ✅ Implementado (Fase 7) |
+| Destino de Recebimento | ✅ Implementado (Fase 8) |
 | Score de Confiança | ✅ recordEvent implementado (Fase 5 e 6) |
 | Git local | ✅ Limpo após commit da Fase 4 |
 
@@ -329,6 +330,47 @@ Testes negativos:
 
 ---
 
+## 5d. Fase 8 — Destino de Recebimento (Implementada)
+
+### Endpoints disponíveis
+
+| Método | Rota | Auth | Descrição |
+|--------|------|------|-----------|
+| POST | `/api/v1/receiving-destinations` | JWT | Cadastrar destino de recebimento |
+| GET | `/api/v1/receiving-destinations/me` | JWT | Listar meus destinos |
+| PATCH | `/api/v1/receiving-destinations/:id` | JWT | Atualizar label ou default |
+| DELETE | `/api/v1/receiving-destinations/:id` | JWT | Excluir logicamente |
+
+### O que foi implementado
+
+- CRUD completo do módulo `ReceivingDestination` (antes era stub com `NotImplementedException`)
+- **Mascaramento** de dados sensíveis: `pixKey` nunca retornado; sempre retorna `maskedValue`
+  - `PIX_CPF` → `***.456` | `PIX_EMAIL` → `e***@gmail.com` | `PIX_PHONE` → `(***) ***-1234` | `PIX_RANDOM` → `****-****-abcd`
+- **Regra de default**: primeiro destino vira default automaticamente; `isDefault: true` promove e demove outros
+- **Bloqueio de exclusão**: recusa com 409 se o usuário tem acordos em estado bloqueante (como recebedor) ou payouts pendentes vinculados ao destino
+- **Integração com `createGuaranteed`**: verifica destino ativo do recebedor antes de criar o acordo; salva `receiverDestinationSnapshot` imutável no acordo
+- **Snapshot travado**: após acordo criado, troca do destino não altera o snapshot — o acordo mantém o destino original
+
+### Decisões desta fase
+
+- **Schema não foi alterado**: `ReceivingDestination`, `ReceivingDestinationType` e `ReceivingDestinationStatus` já existiam. `Agreement.receiverDestinationSnapshot` também já existia.
+- **Status limitados a ACTIVE/DELETED**: o schema tem apenas esses dois valores. `INACTIVE`, `BLOCKED` e `PENDING_VERIFICATION` requerem migration futura.
+- **`ReceivingDestinationType` usado diretamente**: o campo `type` no DTO aceita os valores do enum existente (`PIX_CPF`, `PIX_EMAIL`, etc.) sem camada de mapeamento extra.
+- **`maskValue` é público no service**: chamado pelo `AgreementsService` ao montar o snapshot, sem duplicar a lógica de mascaramento.
+- **Bloqueio conservador**: verifica todos os acordos onde o usuário é receiver com status bloqueante — não apenas o acordo vinculado ao destino específico (pois o `receiverDestinationSnapshot` não tem FK, apenas JSON).
+- **Sem migration**: nenhuma mudança no schema.
+
+### Testes manuais — 2026-06-05
+
+- ✅ Build limpo (`pnpm --filter @selo/api build` sem erros TypeScript)
+- Fluxo A (destino criado): cadastro, listagem, mascaramento, isDefault
+- Fluxo B (bloqueio sem destino): acordo com garantia retorna 400
+- Fluxo C (acordo com destino): snapshot salvo no acordo
+- Fluxo D (bloqueio de exclusão): 409 com acordo ativo
+- Fluxo E (snapshot imutável): acordo mantém snapshot original após mudança de destino
+
+---
+
 ## 5c. Fase 7 — Home/Wallet/Listagens (Implementada)
 
 ### Endpoints disponíveis
@@ -393,20 +435,19 @@ Os módulos abaixo existem como stubs (`NotImplementedException`) e aguardam as 
 
 | Funcionalidade | Fase | Módulo |
 |---|---|---|
-| Destinos de recebimento (ReceivingDestination) | Fase 8 | `receiving-destinations` |
-| Integração real Fitbank/BaaS | Fase 8 | `pix` + `payments` |
-| Webhook real do PSP | Fase 8 | `pix` |
-| Blockchain (submissão real) | Fase 8 | `blockchain-records` |
-| Painel Admin funcional (Next.js) | Fase 8 | `apps/admin` |
-| Notificações push | Fase 8 | `notifications` |
-| Auth admin real (AdminUser + JWT) | Fase 8 | `admin` |
-| App mobile integrado | Fase 8 | `apps/mobile` |
+| Integração real Fitbank/BaaS | Fase 9 | `pix` + `payments` |
+| Webhook real do PSP | Fase 9 | `pix` |
+| Blockchain (submissão real) | Fase 9 | `blockchain-records` |
+| Painel Admin funcional (Next.js) | Fase 9 | `apps/admin` |
+| Notificações push | Fase 9 | `notifications` |
+| Auth admin real (AdminUser + JWT) | Fase 9 | `admin` |
+| App mobile integrado | Fase 9 | `apps/mobile` |
 
 ---
 
 ## 7. Próxima Fase
 
-### Fase 8 — Integração Real e App Mobile
+### Fase 9 — Integração Real e App Mobile
 
 Objetivo: substituir simulações por integrações reais e construir as telas do app mobile.
 
@@ -414,7 +455,6 @@ O que implementar:
 - App mobile (Expo): tela home usando `GET /agreements/summary`, listagens, detalhes
 - Integração Fitbank/BaaS real: cobrança Pix, payout, reembolso
 - Webhook real de confirmação do PSP (`POST /webhooks/pix/confirmation`)
-- `ReceivingDestination` — destinos de recebimento do usuário para payout
 - Auth admin real: login de `AdminUser` com JWT separado
 - Painel Admin (`apps/admin`) funcional — lista disputas, resolve, vê acordos
 - Submissão real à blockchain (Ethereum/Polygon testnet)
@@ -481,6 +521,7 @@ Invoke-RestMethod -Uri "http://localhost:3000/api/v1/receiving-keys/resolve/dev"
 | [docs/auth.md](auth.md) | Autenticação: endpoints, exemplos, fluxo futuro OTP |
 | [docs/receiving-keys.md](receiving-keys.md) | Chave de Recebimento do App: conceito, endpoints, regras, exemplos |
 | [docs/agreements.md](agreements.md) | Acordos: ciclo de vida, filtros expandidos, summary da wallet |
+| [docs/receiving-destinations.md](receiving-destinations.md) | Destino de Recebimento: conceito, endpoints, mascaramento, bloqueio, snapshot |
 | [docs/guaranteed-agreements.md](guaranteed-agreements.md) | Acordos com Garantia: fluxo financeiro, endpoints, simulação, PowerShell |
 | [docs/payments.md](payments.md) | Pagamentos: PaymentIntent, PixCharge, simulate-confirmation, dev vs. produção |
 | [docs/disputes.md](disputes.md) | Disputas: abertura, mensagens, score, resolução admin |

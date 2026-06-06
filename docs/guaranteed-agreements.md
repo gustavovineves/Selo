@@ -13,6 +13,29 @@ Um **Acordo com Garantia** (`type: WITH_GUARANTEE`) é um combinado em que o pag
 | Valor protegido só existe após confirmação do parceiro | `financialStatus = FUNDS_HELD` só muda após webhook/simulação |
 | Pix é o método de entrada no MVP | Débito/cartão fora do escopo inicial |
 | Chave de Recebimento do App ≠ chave Pix | O handle `@usuario` é interno do Selo; a chave Pix real fica no BaaS |
+| **Recebedor precisa ter Destino de Recebimento** | Antes de criar acordo com garantia, o recebedor deve ter um destino ativo cadastrado |
+
+---
+
+## Conceitos: Chave de Recebimento vs. Destino de Recebimento
+
+| | Chave de Recebimento do App | Destino de Recebimento |
+|---|---|---|
+| **Para que serve** | Localizar o recebedor dentro da plataforma | Indicar para onde o dinheiro será enviado futuramente |
+| **Exemplo** | `@maria`, `@joao` | CPF Pix `***.456`, Email Pix `m***@gmail.com` |
+| **Quem configura** | Qualquer usuário para ser encontrado | Usuário que queira receber valor protegido |
+| **Obrigatório para** | Qualquer acordo | Apenas acordos com garantia (como recebedor) |
+| **Mudança afeta acordos antigos?** | Não — snapshot já salvo | Não — snapshot já salvo no acordo |
+| **Integração Pix real** | Não — handle interno | Futuro (Fase 5 / Fitbank) — simulado no MVP |
+
+> **Fluxo de criação do acordo com garantia:**
+> ```
+> Criador informa @maria (Chave de Recebimento)
+>   → sistema resolve maria = User#xyz
+>   → sistema busca destino ativo de User#xyz (Destino de Recebimento)
+>   → se não tiver: 400 "O recebedor precisa configurar um destino de recebimento"
+>   → se tiver: snapshot salvo no acordo (imutável após criação)
+> ```
 
 ---
 
@@ -142,11 +165,26 @@ Cria um Acordo com Garantia.
 
 > **confirmationRule = MANUAL** é o padrão para acordos com garantia. Significa que ambas as partes precisam confirmar explicitamente via `/confirm-completion` antes do payout ser liberado. `SINGLE_PARTY` existe no schema mas não é o padrão para acordos com garantia — usá-lo permite liberação unilateral.
 
-**Response 201:** objeto `Agreement` com `financialGuarantee` embutido
+**Pré-condição:** O recebedor localizado via `counterpartyKey` deve ter pelo menos um **Destino de Recebimento** ativo cadastrado. Caso contrário, a criação é bloqueada com 400.
+
+**Response 201:** objeto `Agreement` com `financialGuarantee` embutido e `receiverDestinationSnapshot` preenchido
+
+**`receiverDestinationSnapshot` (salvo no acordo, imutável):**
+```json
+{
+  "type": "PIX_CPF",
+  "maskedValue": "***.456",
+  "provider": "SIMULATED",
+  "receivingDestinationId": "cm..."
+}
+```
 
 **Erros:**
-- `400` — amount inválido, criando consigo mesmo, counterpartyKey ausente
-- `404` — chave da contraparte não encontrada ou inativa
+| Código | Situação | Mensagem |
+|---|---|---|
+| `400` | Amount inválido, criando consigo mesmo, counterpartyKey ausente | — |
+| `400` | Recebedor sem destino de recebimento ativo | "O recebedor precisa configurar um destino de recebimento antes de receber valor protegido." |
+| `404` | Chave da contraparte não encontrada ou inativa | — |
 
 ---
 
@@ -635,6 +673,7 @@ try {
 | 400 | FUNDS_HELD + /cancel | Use o endpoint de reembolso (/refund). |
 | 400 | Disputa em acordo SIMPLE | Disputas financeiras só em WITH_GUARANTEE. |
 | 400 | Disputa sem FUNDS_HELD | Disputas só enquanto valor protegido. |
+| 400 | Recebedor sem destino de recebimento | O recebedor precisa configurar um destino de recebimento antes de receber valor protegido. |
 | 400 | disputeRule NOT_ALLOWED | Este acordo não permite disputas. |
 | 403 | Não é o pagador | Somente o pagador pode iniciar o depósito. |
 | 403 | Sem acesso | Você não tem acesso a este acordo/garantia/disputa. |
@@ -646,11 +685,27 @@ try {
 
 ---
 
+## Destino de Recebimento — Endpoints relacionados
+
+Ver [docs/receiving-destinations.md](receiving-destinations.md) para documentação completa do módulo.
+
+| Método | Rota | Descrição |
+|---|---|---|
+| POST | `/api/v1/receiving-destinations` | Cadastrar destino de recebimento |
+| GET | `/api/v1/receiving-destinations/me` | Listar meus destinos |
+| PATCH | `/api/v1/receiving-destinations/:id` | Atualizar label ou default |
+| DELETE | `/api/v1/receiving-destinations/:id` | Excluir logicamente |
+
+**Antes de criar acordo com garantia**, o recebedor deve ter pelo menos um destino ativo.
+**Após o acordo ser criado**, o destino fica registrado no `receiverDestinationSnapshot` e não pode ser alterado retroativamente.
+
+---
+
 ## Arquivos implementados
 
-- `apps/api/src/modules/agreements/agreements.service.ts` — `createGuaranteed`, `initiatePayment`, `confirmCompletion`, `release`, `refund`, `openDispute`, `getDispute` (+ atualização de `findOne`, `cancel`, `complete`)
+- `apps/api/src/modules/agreements/agreements.service.ts` — `createGuaranteed`, `initiatePayment`, `confirmCompletion`, `release`, `refund`, `openDispute`, `getDispute` (+ atualização de `findOne`, `cancel`, `complete`); Fase 8: verificação de destino + snapshot
 - `apps/api/src/modules/agreements/agreements.controller.ts` — todos os novos endpoints
-- `apps/api/src/modules/agreements/agreements.module.ts` — imports de AuditLogsModule, TrustScoreModule, BlockchainRecordsModule, FinancialGuaranteesModule
+- `apps/api/src/modules/agreements/agreements.module.ts` — imports de AuditLogsModule, TrustScoreModule, BlockchainRecordsModule, FinancialGuaranteesModule, ReceivingDestinationsModule (Fase 8)
 - `apps/api/src/modules/agreements/dto/create-guaranteed-agreement.dto.ts`
 - `apps/api/src/modules/agreements/dto/open-dispute.dto.ts`
 - `apps/api/src/modules/payments/payments.service.ts` — `simulateConfirmation`

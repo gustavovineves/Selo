@@ -5,6 +5,7 @@ import { AuditLogsModule } from '../audit-logs/audit-logs.module';
 import { TrustScoreModule } from '../trust-score/trust-score.module';
 import { BlockchainRecordsModule } from '../blockchain-records/blockchain-records.module';
 import { FinancialGuaranteesModule } from '../financial-guarantees/financial-guarantees.module';
+import { ReceivingDestinationsModule } from '../receiving-destinations/receiving-destinations.module';
 
 @Module({
   imports: [
@@ -12,6 +13,7 @@ import { FinancialGuaranteesModule } from '../financial-guarantees/financial-gua
     TrustScoreModule,
     BlockchainRecordsModule,
     FinancialGuaranteesModule,
+    ReceivingDestinationsModule,
   ],
   controllers: [AgreementsController],
   providers: [AgreementsService],

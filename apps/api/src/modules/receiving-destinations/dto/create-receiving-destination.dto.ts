@@ -1,19 +1,27 @@
-import { IsString, IsEnum, IsOptional, IsBoolean } from 'class-validator';
+import {
+  IsString,
+  IsEnum,
+  IsOptional,
+  IsBoolean,
+  MinLength,
+  MaxLength,
+} from 'class-validator';
 import { ReceivingDestinationType } from '@prisma/client';
 
 export class CreateReceivingDestinationDto {
-  @IsString()
-  nickname: string;
-
   @IsEnum(ReceivingDestinationType)
   type: ReceivingDestinationType;
 
   @IsString()
-  keyValue: string;
+  @MinLength(1)
+  @MaxLength(500)
+  pixKey: string;
 
   @IsOptional()
   @IsString()
-  bankName?: string;
+  @MinLength(1)
+  @MaxLength(100)
+  label?: string;
 
   @IsOptional()
   @IsBoolean()

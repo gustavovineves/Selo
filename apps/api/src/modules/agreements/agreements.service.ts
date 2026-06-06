@@ -34,6 +34,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { AuditLogsService } from '../audit-logs/audit-logs.service';
 import { TrustScoreService } from '../trust-score/trust-score.service';
 import { BlockchainRecordsService } from '../blockchain-records/blockchain-records.service';
+import { ReceivingDestinationsService } from '../receiving-destinations/receiving-destinations.service';
 import { CreateSimpleAgreementDto } from './dto/create-simple-agreement.dto';
 import { CreateGuaranteedAgreementDto } from './dto/create-guaranteed-agreement.dto';
 import { ListAgreementsDto, MyAgreementRole } from './dto/list-agreements.dto';
@@ -86,6 +87,7 @@ export class AgreementsService {
     private readonly auditLogs: AuditLogsService,
     private readonly trustScore: TrustScoreService,
     private readonly blockchainRecords: BlockchainRecordsService,
+    private readonly receivingDestinations: ReceivingDestinationsService,
   ) {}
 
   // ── Private helpers ────────────────────────────────────────────
@@ -356,6 +358,24 @@ export class AgreementsService {
       avatarUrl: counterpartyProfile?.avatarUrl ?? null,
     };
 
+    // Require the receiver to have an active receiving destination configured.
+    // Snapshot is frozen at creation time — changing the destination later has no effect.
+    const receiverDestination = await this.receivingDestinations.findAnyActive(counterpartyId);
+    if (!receiverDestination) {
+      throw new BadRequestException(
+        'O recebedor precisa configurar um destino de recebimento antes de receber valor protegido.',
+      );
+    }
+    const receiverDestinationSnapshot = {
+      type: receiverDestination.type,
+      maskedValue: this.receivingDestinations.maskValue(
+        receiverDestination.type,
+        receiverDestination.keyValue,
+      ),
+      provider: 'SIMULATED',
+      receivingDestinationId: receiverDestination.id,
+    };
+
     const agreement = await this.prisma.$transaction(async (tx) => {
       const a = await tx.agreement.create({
         data: {
@@ -384,6 +404,7 @@ export class AgreementsService {
           payerId: creatorId,
           receiverId: counterpartyId,
           receiverKeySnapshot,
+          receiverDestinationSnapshot: receiverDestinationSnapshot as Prisma.InputJsonValue,
         },
       });
 
