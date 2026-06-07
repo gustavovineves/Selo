@@ -16,12 +16,15 @@ export class FeedbackController {
   // GET /api/v1/health — público, sem autenticação
   @Get('health')
   health() {
+    const nodeEnv = this.config.get<string>('NODE_ENV', 'development');
+    const isStaging = nodeEnv === 'staging';
     return {
       status: 'ok',
+      app: 'selo-api',
       version: '1.0.0-beta',
-      env: this.config.get<string>('NODE_ENV', 'development'),
+      env: nodeEnv,
       timestamp: new Date().toISOString(),
-      mode: 'sandbox',
+      mode: isStaging ? 'staging' : 'sandbox',
       note: 'Ambiente de teste — nenhum dinheiro real é movimentado.',
     };
   }

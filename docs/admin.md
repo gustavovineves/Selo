@@ -99,6 +99,41 @@ VALUES (gen_random_uuid(), 'admin@selo.app', 'Admin Selo', '<hash-bcrypt>', 'ADM
 
 O hash pode ser gerado com `bcrypt.hashSync('sua-senha', 12)` em Node.js.
 
+### Como criar AdminUser de Staging (Fase 28)
+
+Use o script seguro incluso no projeto:
+
+```bash
+DATABASE_URL="postgresql://..." \
+ADMIN_EMAIL="admin@staging.example.com" \
+ADMIN_NAME="Admin Staging" \
+ADMIN_PASSWORD="<senha-forte-12-chars>" \
+  pnpm create-admin
+```
+
+Gere uma senha forte antes:
+```bash
+openssl rand -base64 24
+```
+
+Ver [docs/deploy-staging.md](deploy-staging.md) para instruções completas.
+
+### Admin Apontando para Staging
+
+Configure o arquivo `apps/admin/.env.local` (não commitar):
+
+```env
+NEXT_PUBLIC_API_URL=https://api.staging.selo.app/api/v1
+NEXT_PUBLIC_APP_ENV=staging
+```
+
+Após configurar, faça build e inicie:
+
+```bash
+pnpm --filter @selo/admin build
+pnpm --filter @selo/admin start
+```
+
 ---
 
 ## Estrutura do Projeto

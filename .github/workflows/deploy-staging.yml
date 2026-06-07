@@ -1,0 +1,199 @@
+name: Deploy Staging (Manual)
+
+# Disparo manual via GitHub Actions → Actions → Deploy Staging → Run workflow
+# Nunca roda automaticamente em push/PR.
+# Ver docs/deploy-staging.md para instruções completas.
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Digite "staging" para confirmar o deploy'
+        required: true
+        default: ''
+      skip_tests:
+        description: 'Pular testes antes do deploy? (não recomendado)'
+        required: false
+        default: 'false'
+        type: boolean
+
+jobs:
+  # ── Validação do input de confirmação ───────────────────────────
+  validate-input:
+    name: Validar confirmação
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verificar confirmação
+        run: |
+          if [ "${{ github.event.inputs.confirm }}" != "staging" ]; then
+            echo "❌ Confirmação inválida. Digite exatamente 'staging' para confirmar."
+            exit 1
+          fi
+          echo "✅ Confirmação aceita."
+
+  # ── Testes antes do deploy (pode ser pulado com skip_tests=true) ─
+  test:
+    name: Testes antes do deploy
+    runs-on: ubuntu-latest
+    needs: validate-input
+    if: ${{ github.event.inputs.skip_tests != 'true' }}
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: selo
+          POSTGRES_PASSWORD: selopassword
+          POSTGRES_DB: selodb
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U selo -d selodb"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgresql://selo:selopassword@localhost:5432/selodb?schema=public
+      JWT_SECRET: ci-jwt-secret-for-testing-only-not-for-production-00000000
+      JWT_REFRESH_SECRET: ci-refresh-secret-for-testing-only-not-for-production-0000
+      JWT_EXPIRES_IN: 15m
+      JWT_REFRESH_EXPIRES_IN: 7d
+      ADMIN_JWT_SECRET: ci-admin-jwt-secret-for-testing-only-not-for-production-000
+      ADMIN_JWT_EXPIRES_IN: 1d
+      ADMIN_TOKEN: ci-admin-token-for-testing-only
+      PORT: 3000
+      NODE_ENV: test
+      LOG_LEVEL: error
+      RATE_LIMIT_TTL: 60000
+      RATE_LIMIT_MAX: 10000
+      PAYMENT_PROVIDER: simulated
+      FITBANK_ENV: sandbox
+      FITBANK_ENABLE_REAL_CALLS: 'false'
+      FITBANK_CLIENT_ID: ci-fitbank-client-fake
+      FITBANK_CLIENT_SECRET: ci-fitbank-secret-fake
+      FITBANK_WEBHOOK_SECRET: ci-fitbank-webhook-secret-fake
+      KYC_PROVIDER: simulated
+      KYC_ENABLE_REAL_CALLS: 'false'
+      BLOCKCHAIN_PROVIDER: simulated
+      BLOCKCHAIN_ENABLE_REAL_CALLS: 'false'
+      BLOCKCHAIN_NETWORK: polygon_amoy
+      BLOCKCHAIN_RPC_URL: ''
+      BLOCKCHAIN_PRIVATE_KEY: ''
+      BLOCKCHAIN_CONTRACT_ADDRESS: ''
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 9
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+
+      - name: Instalar dependências
+        run: pnpm install --frozen-lockfile
+
+      - name: Gerar Prisma Client
+        run: pnpm --filter @selo/api prisma:generate
+
+      - name: Aplicar migrations (banco de teste)
+        run: pnpm --filter @selo/api prisma:deploy
+
+      - name: Testes unitários
+        run: pnpm --filter @selo/api test
+
+      - name: Testes E2E
+        run: pnpm --filter @selo/api test:e2e
+
+      - name: Build da API
+        run: pnpm --filter @selo/api build
+
+      - name: Typecheck Mobile
+        run: pnpm --filter @selo/mobile typecheck
+
+      - name: Typecheck Admin
+        run: pnpm --filter @selo/admin typecheck
+
+  # ── Deploy de Staging ────────────────────────────────────────────
+  deploy:
+    name: Deploy para Staging
+    runs-on: ubuntu-latest
+    needs: [validate-input, test]
+    # Roda mesmo se testes forem pulados (skip_tests=true)
+    if: |
+      always() &&
+      needs.validate-input.result == 'success' &&
+      (needs.test.result == 'success' || needs.test.result == 'skipped')
+    environment: staging
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 9
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+
+      - name: Instalar dependências
+        run: pnpm install --frozen-lockfile
+
+      - name: Gerar Prisma Client
+        run: pnpm --filter @selo/api prisma:generate
+
+      - name: Build da API
+        run: pnpm --filter @selo/api build
+
+      - name: Build do Admin
+        run: pnpm --filter @selo/admin build
+        env:
+          NEXT_PUBLIC_API_URL: ${{ secrets.STAGING_API_URL }}
+          NEXT_PUBLIC_APP_ENV: staging
+
+      # ── Instruções de deploy real ──────────────────────────────
+      # O passo abaixo é um placeholder. Substitua com sua estratégia:
+      # - SSH + rsync para VPS (ex: DigitalOcean, Hetzner)
+      # - Docker push + pull no servidor
+      # - Railway / Render deploy via CLI
+      # - Vercel CLI para o admin
+
+      - name: Placeholder — Deploy real
+        run: |
+          echo "════════════════════════════════════════════════════"
+          echo " ATENÇÃO: Este passo é um placeholder."
+          echo " Configure aqui seu deploy real para staging."
+          echo " Ver docs/deploy-staging.md para opções."
+          echo "════════════════════════════════════════════════════"
+          echo "Branch: ${{ github.ref_name }}"
+          echo "Commit: ${{ github.sha }}"
+          echo "Iniciado por: ${{ github.actor }}"
+          echo "Ambiente: staging"
+
+      - name: Verificar health após deploy
+        run: |
+          echo "Aguardando API inicializar..."
+          sleep 10
+          # Descomente e ajuste a URL quando o deploy real estiver configurado:
+          # curl -f https://api.staging.selo.app/api/v1/health || exit 1
+          echo "Verificação manual: GET https://api.staging.selo.app/api/v1/health"
+
+      - name: Resumo do deploy
+        run: |
+          echo "## Deploy Staging Concluído" >> $GITHUB_STEP_SUMMARY
+          echo "- **Branch:** ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Commit:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Iniciado por:** ${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Testes pulados:** ${{ github.event.inputs.skip_tests }}" >> $GITHUB_STEP_SUMMARY

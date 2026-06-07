@@ -70,15 +70,23 @@ pnpm dev:mobile
 | `pnpm dev:api`     | Inicia a API NestJS em modo watch        |
 | `pnpm dev:mobile`  | Inicia o app Expo                        |
 | `pnpm dev:admin`   | Inicia o admin Next.js                   |
-| `pnpm build:api`   | Build de produção da API                 |
-| `pnpm build:admin` | Build de produção do admin               |
-| `pnpm docker:up`   | Sobe o PostgreSQL via Docker             |
-| `pnpm docker:down` | Derruba os containers Docker             |
-| `pnpm db:migrate`  | Roda migrações Prisma                    |
-| `pnpm db:generate` | Gera o Prisma Client                     |
-| `pnpm db:studio`   | Abre o Prisma Studio                     |
-| `pnpm lint`        | Lint em todos os pacotes                 |
-| `pnpm typecheck`   | Type check em todos os pacotes           |
+| `pnpm build:api`       | Build de produção da API                    |
+| `pnpm build:admin`     | Build de produção do admin                  |
+| `pnpm docker:up`       | Sobe o PostgreSQL via Docker                |
+| `pnpm docker:down`     | Derruba os containers Docker                |
+| `pnpm db:migrate`      | Roda migrações Prisma (dev)                 |
+| `pnpm db:deploy`       | Aplica migrations em staging (deploy)       |
+| `pnpm db:generate`     | Gera o Prisma Client                        |
+| `pnpm db:studio`       | Abre o Prisma Studio                        |
+| `pnpm test:api`        | Testes unitários da API                     |
+| `pnpm test:e2e`        | Testes E2E da API                           |
+| `pnpm test:all`        | Testes unitários + E2E                      |
+| `pnpm validate`        | Build API + typecheck mobile + typecheck admin |
+| `pnpm prisma:deploy`   | Alias para pnpm db:deploy                   |
+| `pnpm prisma:generate` | Alias para pnpm db:generate                 |
+| `pnpm create-admin`    | Cria AdminUser de staging (via variáveis de env) |
+| `pnpm lint`            | Lint em todos os pacotes                    |
+| `pnpm typecheck`       | Type check em todos os pacotes              |
 
 ---
 
@@ -94,6 +102,8 @@ pnpm dev:mobile
 - [Blockchain como Prova (Fase 26)](docs/blockchain-proof.md)
 - [Beta Fechado](docs/beta.md)
 - [Linguagem e UX Copy](docs/ux-copy.md)
+- [Deploy de Staging](docs/deploy-staging.md)
+- [Checklist de Staging](docs/staging-checklist.md)
 
 ---
 
@@ -115,12 +125,13 @@ pnpm dev:mobile
 | Fase 25 | ✅ Concluído | KYC Progressivo: verificação financeira sob demanda, FinancialProfile, CPF validado, bloqueio em acordo com garantia, 206 testes unitários, 101 E2E |
 | Fase 26 | ✅ Concluído | Blockchain como Prova: IBlockchainProofProvider, SimulatedProvider, hash canônico SHA-256, sanitização de dados sensíveis, endpoints /proofs, seção mobile, 239 testes unitários, 113 E2E |
 | Fase 27 | ✅ Concluído | UX Final e Beta Fechado: health público, feedback beta, Central de Ajuda, banner sandbox, onboarding com 5 slides, modal de feedback, admin (usuários/acordos/provas), docs/beta.md, docs/ux-copy.md |
+| Fase 28 | ✅ Concluído | Preparação de Staging/Deploy: testes health sem secrets, .env staging, scripts root, docker-compose.staging.example.yml, workflow de deploy (workflow_dispatch), script create-admin, docs/deploy-staging.md, docs/staging-checklist.md |
 
 ## Próximas Etapas (não implementadas)
 
 | Fase | Descrição |
 |------|-----------|
-| Fase 28 | Staging/Deploy ou Beta Fechado Operacional |
+| Fase 29 | Beta Fechado Operacional: subir staging real, convidar usuários, coletar feedback, iterar |
 
 ---
 

@@ -184,13 +184,114 @@ Após cada sessão de teste, coletar as seguintes respostas (formulário ou entr
 
 ---
 
-## 12. Próximos Passos Após o Beta
+## 12. Como Rodar o Beta em Staging
 
-Ao concluir o beta fechado e coletar feedback suficiente, os próximos passos são:
+O beta fechado requer um ambiente de staging funcional antes de convidar usuários externos.
 
-1. **Analisar feedback** e priorizar correções urgentes.
-2. **Decidir**: lançar beta público ou ir direto para produção financeira.
-3. **Fase 28 — Staging/Deploy**: configurar ambiente de staging, CI/CD, secrets reais, banco isolado.
+### 12.1 Número Inicial Recomendado de Usuários
+
+| Fase do beta | Número de convidados | Objetivo |
+|---|---|---|
+| Fase 1 (piloto) | 5–10 | Validar fluxo técnico com usuários de confiança |
+| Fase 2 (beta fechado) | 10–30 | Validar UX e identificar fricções |
+| Fase 3 (beta ampliado) | 30–100 | Medir ativação e retenção |
+
+### 12.2 Pré-requisitos Técnicos
+
+Antes de convidar usuários, confirme o checklist completo em [docs/staging-checklist.md](staging-checklist.md).
+
+Itens críticos:
+- API rodando sem crashes em staging.
+- AdminUser de staging criado e login funcional.
+- Health retornando `"mode": "staging"`.
+- HTTPS ativo.
+- Todos os provedores em modo simulado.
+
+### 12.3 Fluxos a Testar com Usuários Reais
+
+Ver seção 4 deste documento (O Que Testar).
+
+Prioridade máxima para o primeiro ciclo:
+1. Cadastro sem CPF.
+2. Configuração de Chave de Recebimento.
+3. Criação e aceite de combinado simples.
+4. Verificação financeira simulada.
+5. Criação e pagamento de combinado com garantia (simulado).
+6. Contestação e resolução admin.
+
+### 12.4 Perguntas para os Convidados
+
+Ver seção 5 deste documento (Perguntas de Feedback).
+
+Canais de coleta:
+- Modal de feedback no app (Perfil → Enviar feedback).
+- E-mail de resposta ao convite do beta.
+- Entrevista opcional (video call 30min) para usuários mais engajados.
+
+### 12.5 Critérios de Sucesso do Beta
+
+| Critério | Meta |
+|---|---|
+| Cadastro sem assistência | >80% dos convidados |
+| Combinado simples criado | >70% dos convidados |
+| Verificação financeira concluída | >50% dos que tentaram |
+| Combinado com garantia criado | >30% dos convidados |
+| Feedback enviado pelo app | >50% dos convidados |
+| Zero crashes críticos reportados | Obrigatório |
+
+### 12.6 Critérios para Bloquear o Beta
+
+Suspender o beta imediatamente se:
+- API em crash persistente (health retornando erro).
+- AdminUser bloqueado (sem acesso ao painel admin).
+- Dados de usuários sendo expostos indevidamente.
+- Banco de dados corrompido.
+- Erro que impeça cadastro ou login.
+
+### 12.7 Como Registrar Bugs
+
+**Pelo app:** Perfil → Enviar feedback → Categoria: "Encontrei um problema".
+
+**Por e-mail:** Responder o e-mail de convite.
+
+**O que incluir no relato:**
+- Qual tela estava aberta.
+- O que estava tentando fazer.
+- O que aconteceu de inesperado (mensagem de erro, se houver).
+- Dispositivo/sistema operacional.
+
+### 12.8 Como Reportar Disputa Manual (Admin)
+
+Durante o beta, disputas são resolvidas manualmente:
+1. Acesse `https://admin.staging.selo.app`.
+2. Seção "Contestações" no menu.
+3. Selecione a disputa pelo ID do acordo.
+4. Leia as evidências disponíveis.
+5. Clique em "Liberar para recebedor" ou "Reembolsar pagador".
+
+### 12.9 Limitações Explícitas do Beta
+
+| Funcionalidade | Status |
+|---|---|
+| Pix real | ❌ Simulado — nenhum Pix real acontece |
+| Dinheiro real | ❌ Não movimentado |
+| KYC externo | ❌ Simulado — sem consulta a Serpro ou bureau |
+| Blockchain real | ❌ Simulado — sem rede externa |
+| Fitbank produção | ❌ Apenas sandbox simulado |
+| Chat entre partes | ❌ Não implementado |
+| Notificações push | ❌ Apenas in-app |
+| Upload de avatar | ❌ Não implementado |
+| Dados migrados para produção | ❌ Não garantido |
+
+---
+
+## 13. Próximos Passos Após o Beta
+
+Ao concluir o beta fechado e coletar feedback suficiente:
+
+1. **Analisar feedback** — priorizar correções urgentes de UX e bugs.
+2. **Fase 29 — Beta Fechado Operacional:** Iterar sobre o feedback coletado, resolver fricções, medir ativação dos fluxos críticos.
+3. **Decidir**: lançar beta público ou ir direto para produção financeira.
 4. **Integração Fitbank real** (requer aprovação do Banco Central / parceiro BaaS).
 5. **KYC real** (Serpro ou bureau de crédito aprovado).
 6. **Pix real** (via BaaS).

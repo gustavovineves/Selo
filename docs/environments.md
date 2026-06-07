@@ -236,22 +236,56 @@ curl -X POST http://localhost:3000/api/v1/payments/webhooks/fitbank \
 
 ---
 
-## 11. Setup de Staging (Preparação — Fase Futura)
+## 11. Setup de Staging (Fase 28)
 
-Para criar um ambiente de staging:
+Ver **[docs/deploy-staging.md](deploy-staging.md)** para o guia completo.
+
+Resumo do fluxo:
 
 1. **Banco isolado:** PostgreSQL separado — nunca usar o banco de dev ou de produção.
-2. **Variáveis:** Copiar `.env.example` e preencher com valores reais de staging.
-3. **GitHub Secrets:** Cadastrar todas as variáveis marcadas na seção 4 como "GitHub Secrets".
-4. **Admin inicial:** Criar `AdminUser` no banco de staging via SQL (nunca commitar hash):
-   ```sql
-   INSERT INTO admin_users (id, email, name, password_hash, role, status, created_at, updated_at)
-   VALUES (gen_random_uuid(), 'admin@staging.selo.app', 'Admin Staging',
-           '<bcrypt-hash>', 'ADMIN', 'ACTIVE', NOW(), NOW());
+2. **Variáveis:** Configurar no painel do provedor (Railway, Render, Fly.io, VPS).
+   - Nunca commitar `.env` de staging no repositório.
+   - Ver seção de staging nos arquivos `.env.example` para referência de variáveis.
+3. **Migrations:** `pnpm --filter @selo/api prisma:deploy` (nunca `prisma migrate dev`).
+4. **Prisma Client:** `pnpm --filter @selo/api prisma:generate`.
+5. **AdminUser:** Criar via script:
+   ```bash
+   DATABASE_URL="..." ADMIN_EMAIL="..." ADMIN_NAME="..." ADMIN_PASSWORD="..." pnpm create-admin
    ```
-5. **API URL:** Configurar `NEXT_PUBLIC_API_URL` no admin e `EXPO_PUBLIC_API_URL` no mobile apontando para o staging.
-6. **CORS:** Definir `CORS_ORIGINS` com o domínio do painel admin de staging.
-7. **Fitbank/Pix:** Não configurar dinheiro real — usar sandbox apenas a partir da Fase 24.
+6. **API URL:** Configurar `NEXT_PUBLIC_API_URL` (admin) e `EXPO_PUBLIC_API_URL` (mobile).
+7. **CORS:** `CORS_ORIGINS` com domínio de staging — sem wildcard.
+8. **Validar health:**
+   ```bash
+   curl https://api.staging.selo.app/api/v1/health
+   ```
+   Espera: `{"status":"ok","env":"staging","mode":"staging",...}`.
+9. **Fitbank/KYC/Blockchain:** Todos simulados em staging — nenhuma chamada real.
+
+### GitHub Secrets necessários para workflow de deploy
+
+| Secret | Valor |
+|---|---|
+| `STAGING_DATABASE_URL` | Connection string PostgreSQL staging |
+| `STAGING_JWT_SECRET` | JWT_SECRET (64+ chars, gerado com openssl) |
+| `STAGING_JWT_REFRESH_SECRET` | JWT_REFRESH_SECRET (diferente do anterior) |
+| `STAGING_ADMIN_JWT_SECRET` | ADMIN_JWT_SECRET (diferente dos dois anteriores) |
+| `STAGING_CORS_ORIGINS` | Domínio do admin staging |
+| `STAGING_API_URL` | URL pública da API staging |
+
+### Checklist rápido de segurança de staging
+
+| Item | Verificação |
+|---|---|
+| HTTPS | Obrigatório |
+| DATABASE_URL no repo | ❌ Nunca |
+| JWT secrets no repo | ❌ Nunca |
+| CORS wildcard | ❌ Nunca |
+| FITBANK_ENABLE_REAL_CALLS | `false` |
+| KYC_ENABLE_REAL_CALLS | `false` |
+| BLOCKCHAIN_ENABLE_REAL_CALLS | `false` |
+| BLOCKCHAIN_PRIVATE_KEY | Vazio em staging simulado |
+
+Ver [docs/staging-checklist.md](staging-checklist.md) para a lista completa.
 
 ---
 

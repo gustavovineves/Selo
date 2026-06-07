@@ -211,7 +211,7 @@ pnpm --filter @selo/mobile ios
 
 ### URL da API
 
-Por padrão: `http://localhost:3000/api/v1`.
+Por padrão: `http://localhost:3000/api/v1` (via `EXPO_PUBLIC_API_URL` em `apps/mobile/.env`).
 
 Para configurar outra URL, defina `EXPO_PUBLIC_API_URL` no ambiente antes de iniciar o bundler:
 
@@ -220,6 +220,21 @@ EXPO_PUBLIC_API_URL=http://192.168.1.100:3000/api/v1 pnpm dev:mobile
 ```
 
 > **Android real:** use o IP local da máquina (ex: `http://192.168.1.100:3000`). Emulador Android usa `http://10.0.2.2:3000`.
+
+### Mobile Apontando para Staging (Fase 28)
+
+```bash
+# Configurar no arquivo apps/mobile/.env (não commitar):
+EXPO_PUBLIC_API_URL=https://api.staging.selo.app/api/v1
+EXPO_PUBLIC_APP_ENV=staging
+
+# Iniciar com cache limpo após trocar URL:
+npx expo start --clear
+# ou:
+pnpm --filter @selo/mobile start -- --clear
+```
+
+Ver [docs/deploy-staging.md](deploy-staging.md) para o guia completo de staging.
 
 ### Token de acesso
 

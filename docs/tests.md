@@ -1,20 +1,26 @@
-# Testes Automatizados — Selo API (Fase 18/19/20)
+# Testes Automatizados — Selo API (Fases 16–28)
 
 ## Objetivo
 
 Proteger o núcleo do MVP com testes unitários automatizados (Fase 16/17) e provar que o fluxo completo do MVP funciona de ponta a ponta com banco de dados real (Fase 18 — testes E2E com PostgreSQL local).
 
-Fase 18 implementou os testes E2E. Fase 19 (polimento UX do prazo mobile) não alterou nenhum teste. Fase 20 (auditoria final) corrigiu o bug de formatação de dueDate na tela de detalhe do mobile — nenhum teste foi alterado. Os 238 testes continuam passando sem modificação.
+**Fase 28:** Adicionados testes de `FeedbackController` (health seguro, sem exposição de secrets, modo staging/sandbox).
 
 ---
 
 ## Como Rodar
 
 ```bash
-# Testes unitários do backend (155 testes, ~10s, sem banco real)
+# Testes unitários do backend (~250 testes, ~10s, sem banco real)
 pnpm --filter @selo/api test
 
-# Testes E2E com banco PostgreSQL real (83 testes, ~6s, requer Docker rodando)
+# Todos os testes unitários + E2E (atalho root)
+pnpm test:all
+
+# Validar build + typechecks (atalho root)
+pnpm validate
+
+# Testes E2E com banco PostgreSQL real (~113 testes, ~6s, requer Docker rodando)
 pnpm --filter @selo/api test:e2e
 
 # Testes com cobertura

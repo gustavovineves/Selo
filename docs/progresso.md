@@ -1,6 +1,6 @@
 # Progresso do Projeto Selo
 
-Última atualização: 2026-06-07 (Fase 27 — UX Final e Beta Fechado)
+Última atualização: 2026-06-07 (Fase 28 — Preparação de Staging/Deploy)
 
 ---
 
@@ -54,6 +54,7 @@
 | KYC Progressivo (FinancialProfile, CPF, bloqueio garantia) | ✅ Implementado (Fase 25) |
 | Blockchain como Prova (hash canônico, provider simulated, endpoints /proofs) | ✅ Implementado (Fase 26) |
 | UX Final e Beta Fechado (health público, feedback, Central de Ajuda, admin expandido) | ✅ Implementado (Fase 27) |
+| Staging/Deploy (testes health, .env staging, scripts, docker-compose staging, workflow deploy, create-admin, docs) | ✅ Implementado (Fase 28) |
 
 ### Estrutura do monorepo
 
@@ -1979,12 +1980,68 @@ Não. Nenhuma migration nesta fase.
 
 ---
 
-## 7. Próxima Fase
+## 7. Fase 28 — Preparação de Staging/Deploy (Implementada)
 
-Fases sugeridas após UX Final e Beta Fechado (Fase 27):
+### Objetivo
 
-- **Fase 28 — Staging/Deploy**: configurar CI/CD, ambiente de staging isolado, GitHub Secrets, banco de staging, AdminUser de staging.
-- **Fase 28 — Beta Fechado Operacional**: convidar usuários reais, coletar feedback, iterar.
+Preparar infraestrutura e documentação para subir o Selo fora da máquina local, antes de convidar usuários reais.
+
+### Arquivos Criados
+
+| Arquivo | Descrição |
+|---|---|
+| `apps/api/src/modules/feedback/feedback.controller.spec.ts` | Testes: health sem secrets, modo staging/sandbox |
+| `docker-compose.staging.example.yml` | Compose de referência para staging em VPS |
+| `.github/workflows/deploy-staging.yml` | Workflow manual de deploy (workflow_dispatch) |
+| `scripts/create-admin.ts` | Script seguro para criar AdminUser em staging |
+| `docs/deploy-staging.md` | Guia completo de deploy (banco, API, admin, mobile) |
+| `docs/staging-checklist.md` | Checklist técnico + produto + segurança pré-beta |
+
+### Arquivos Modificados
+
+| Arquivo | Alteração |
+|---|---|
+| `apps/api/src/modules/feedback/feedback.controller.ts` | Health: campo `app`, modo `staging` vs `sandbox` |
+| `.env.example` | Seção staging comentada |
+| `apps/api/.env.example` | Seção staging com todas as vars comentadas |
+| `apps/admin/.env.example` | NEXT_PUBLIC_APP_ENV, NEXT_PUBLIC_APP_VERSION |
+| `apps/mobile/.env.example` | EXPO_PUBLIC_APP_ENV, instruções staging |
+| `package.json` | Scripts: test:api, test:e2e, test:all, validate, prisma:deploy, prisma:generate, create-admin |
+| `docs/environments.md` | Seção 11 expandida com detalhes de staging (Fase 28) |
+| `docs/beta.md` | Seções 12 e 13: como rodar beta em staging, critérios, limitações |
+| `docs/tests.md` | Contadores atualizados, scripts root documentados |
+| `docs/mobile.md` | Seção de mobile apontando para staging |
+| `docs/admin.md` | Seção de admin staging + script create-admin |
+| `README.md` | Fase 28 na tabela, scripts expandidos, docs de staging |
+
+### Testes (Fase 28)
+
+| Suite | Resultado |
+|---|---|
+| Testes unitários API | ✅ ~250 testes passando (13 specs + FeedbackController spec) |
+| Testes E2E | ✅ ~113 testes passando |
+| Build API | ✅ Exit 0 |
+| Typecheck Mobile | ✅ Exit 0 |
+| Typecheck Admin | ✅ Exit 0 |
+
+### Restrições Mantidas
+
+Nenhuma restrição absoluta foi violada nesta fase:
+- Fitbank produção: não integrado
+- Pix produção: não integrado
+- KYC real: não integrado
+- Blockchain real: não integrada
+- Dinheiro real: não movimentado
+- Chat: não implementado
+- CPF sem máscara: não exposto
+- dueDate obrigatório: mantido
+- Acordo com garantia sem destino ativo: não permitido
+
+---
+
+## 8. Próxima Fase
+
+- **Fase 29 — Beta Fechado Operacional**: subir ambiente de staging real no provedor, criar AdminUser de staging, convidar 10–30 usuários, coletar feedback, corrigir fricções identificadas.
 
 Não implementar sem instrução explícita: Fitbank real, blockchain real com private key, KYC real, push notifications reais.
 

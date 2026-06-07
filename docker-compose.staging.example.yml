@@ -1,0 +1,100 @@
+# =====================================================================
+# docker-compose.staging.example.yml
+# Exemplo de composição para ambiente de staging do Selo.
+# NÃO usar em produção real sem revisão de segurança.
+# NÃO commitar com valores reais de senha/secret.
+#
+# Como usar:
+#   1. Copie como docker-compose.staging.yml (não rastreado pelo Git)
+#   2. Preencha as variáveis com valores reais de staging
+#   3. Execute: docker compose -f docker-compose.staging.yml up -d
+#   4. Rode migrations: docker exec selo_api_staging pnpm prisma:deploy
+#
+# Ver docs/deploy-staging.md para instruções completas.
+# =====================================================================
+
+version: '3.8'
+
+services:
+
+  # ── PostgreSQL de Staging ─────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: selo_postgres_staging
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-selo_staging}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      POSTGRES_DB: ${POSTGRES_DB:-selodb_staging}
+    volumes:
+      - postgres_staging_data:/var/lib/postgresql/data
+    # Em staging, não expor porta para fora do host se possível.
+    # Se precisar de acesso externo para migrations, use temporariamente:
+    # ports:
+    #   - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-selo_staging} -d ${POSTGRES_DB:-selodb_staging}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # ── API NestJS ────────────────────────────────────────────────────
+  api:
+    image: node:20-alpine
+    container_name: selo_api_staging
+    working_dir: /app
+    # Em staging real, use a imagem buildada — ex: ghcr.io/seu-org/selo-api:latest
+    # image: ghcr.io/seu-org/selo-api:latest
+    command: sh -c "npm install -g pnpm && pnpm install --frozen-lockfile && pnpm prisma:generate && pnpm prisma:deploy && node dist/main"
+    ports:
+      - "${API_PORT:-3000}:3000"
+    environment:
+      NODE_ENV: staging
+      DATABASE_URL: postgresql://${POSTGRES_USER:-selo_staging}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-selodb_staging}?schema=public
+      PORT: 3000
+      LOG_LEVEL: info
+      # Secrets via env file ou secret manager — NUNCA hardcoded
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-15m}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:?JWT_REFRESH_SECRET is required}
+      JWT_REFRESH_EXPIRES_IN: ${JWT_REFRESH_EXPIRES_IN:-7d}
+      ADMIN_JWT_SECRET: ${ADMIN_JWT_SECRET:?ADMIN_JWT_SECRET is required}
+      ADMIN_JWT_EXPIRES_IN: ${ADMIN_JWT_EXPIRES_IN:-1d}
+      CORS_ORIGINS: ${CORS_ORIGINS:-https://admin.staging.selo.app}
+      RATE_LIMIT_TTL: ${RATE_LIMIT_TTL:-60000}
+      RATE_LIMIT_MAX: ${RATE_LIMIT_MAX:-100}
+      APP_PUBLIC_URL: ${APP_PUBLIC_URL:-https://admin.staging.selo.app}
+      API_PUBLIC_URL: ${API_PUBLIC_URL:-https://api.staging.selo.app/api/v1}
+      PAYMENT_PROVIDER: ${PAYMENT_PROVIDER:-simulated}
+      FITBANK_ENV: sandbox
+      FITBANK_ENABLE_REAL_CALLS: 'false'
+      KYC_PROVIDER: simulated
+      KYC_ENABLE_REAL_CALLS: 'false'
+      BLOCKCHAIN_PROVIDER: simulated
+      BLOCKCHAIN_ENABLE_REAL_CALLS: 'false'
+      BLOCKCHAIN_NETWORK: polygon_amoy
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - /app/apps/api/node_modules
+
+  # ── Admin Next.js (opcional — pode hospedar separado no Vercel/etc.) ─
+  # admin:
+  #   image: node:20-alpine
+  #   container_name: selo_admin_staging
+  #   working_dir: /app/apps/admin
+  #   command: sh -c "pnpm install --frozen-lockfile && pnpm build && pnpm start"
+  #   ports:
+  #     - "${ADMIN_PORT:-3001}:3001"
+  #   environment:
+  #     NEXT_PUBLIC_API_URL: ${API_PUBLIC_URL:-https://api.staging.selo.app/api/v1}
+  #     NEXT_PUBLIC_APP_ENV: staging
+  #   restart: unless-stopped
+
+volumes:
+  postgres_staging_data:
+    driver: local
