@@ -18,6 +18,7 @@ import { BlockchainRecordsModule } from './modules/blockchain-records/blockchain
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { AuditLogsModule } from './modules/audit-logs/audit-logs.module';
 import { AdminModule } from './modules/admin/admin.module';
+import { FeedbackModule } from './modules/feedback/feedback.module';
 import { validateEnv } from './config/env.validation';
 
 @Module({
@@ -51,6 +52,7 @@ import { validateEnv } from './config/env.validation';
     NotificationsModule,
     AuditLogsModule,
     AdminModule,
+    FeedbackModule,
   ],
 })
 export class AppModule {}

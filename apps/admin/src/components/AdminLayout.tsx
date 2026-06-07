@@ -9,8 +9,11 @@ interface AdminLayoutProps {
 }
 
 const NAV_LINKS = [
-  { href: '/dashboard', label: 'Dashboard', icon: '▦' },
-  { href: '/disputes',  label: 'Contestações', icon: '⚖' },
+  { href: '/dashboard',  label: 'Dashboard',       icon: '▦', group: 'main' },
+  { href: '/disputes',   label: 'Contestações',    icon: '⚖', group: 'main' },
+  { href: '/users',      label: 'Usuários',         icon: '👤', group: 'data' },
+  { href: '/agreements', label: 'Acordos',          icon: '📄', group: 'data' },
+  { href: '/proofs',     label: 'Registros de prova', icon: '🔒', group: 'data' },
 ];
 
 export function AdminLayout({ children }: AdminLayoutProps) {
@@ -116,7 +119,7 @@ export function AdminLayout({ children }: AdminLayoutProps) {
               textTransform: 'uppercase',
             }}
           >
-            Auth provisória — MVP
+            Selo Beta · Ambiente de teste
           </div>
           <button
             onClick={handleLogout}

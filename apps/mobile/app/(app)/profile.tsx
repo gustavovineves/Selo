@@ -11,6 +11,7 @@ import {
   Share,
   RefreshControl,
   ActivityIndicator,
+  Modal,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
@@ -18,9 +19,162 @@ import { useProfile } from '../../src/hooks/useProfile';
 import { authService } from '../../src/services/auth.service';
 import { receivingKeysService } from '../../src/services/receiving-keys.service';
 import { receivingDestinationsService } from '../../src/services/receiving-destinations.service';
+import { feedbackService, type FeedbackCategory } from '../../src/services/feedback.service';
 import { LoadingState, EmptyState } from '../../src/components';
 import { Colors, Spacing, Radii, FontSize, FontWeight, Shadow } from '../../src/theme';
 import type { TrustScoreLevel, ReceivingDestinationResponse } from '../../src/types/api';
+
+// ── Feedback Modal ────────────────────────────────────────────────────────────
+
+const FEEDBACK_CATEGORIES: { value: FeedbackCategory; label: string; icon: string }[] = [
+  { value: 'BUG', label: 'Encontrei um problema', icon: 'bug-outline' },
+  { value: 'SUGGESTION', label: 'Tenho uma sugestão', icon: 'bulb-outline' },
+  { value: 'QUESTION', label: 'Tenho uma dúvida', icon: 'help-circle-outline' },
+  { value: 'GENERAL', label: 'Comentário geral', icon: 'chatbubble-outline' },
+];
+
+function FeedbackModal({
+  visible,
+  onClose,
+}: {
+  visible: boolean;
+  onClose: () => void;
+}) {
+  const [category, setCategory] = useState<FeedbackCategory>('GENERAL');
+  const [message, setMessage] = useState('');
+  const [sending, setSending] = useState(false);
+
+  async function handleSend() {
+    if (!message.trim()) {
+      Alert.alert('Mensagem vazia', 'Escreva sua mensagem antes de enviar.');
+      return;
+    }
+    setSending(true);
+    try {
+      await feedbackService.submit({ category, message: message.trim() });
+      Alert.alert(
+        'Feedback enviado!',
+        'Obrigado por ajudar a melhorar o Selo. Sua opinião é muito importante para nós.',
+        [{ text: 'OK', onPress: () => { setMessage(''); onClose(); } }],
+      );
+    } catch {
+      Alert.alert('Erro', 'Não foi possível enviar o feedback. Tente novamente.');
+    } finally {
+      setSending(false);
+    }
+  }
+
+  return (
+    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+      <View style={fbStyles.overlay}>
+        <View style={fbStyles.sheet}>
+          <View style={fbStyles.handle} />
+          <Text style={fbStyles.title}>Enviar feedback do beta</Text>
+          <Text style={fbStyles.sub}>Sua opinião ajuda a melhorar o Selo antes do lançamento.</Text>
+
+          <Text style={fbStyles.label}>Categoria</Text>
+          <View style={fbStyles.categories}>
+            {FEEDBACK_CATEGORIES.map((c) => (
+              <TouchableOpacity
+                key={c.value}
+                style={[fbStyles.catChip, category === c.value && fbStyles.catChipActive]}
+                onPress={() => setCategory(c.value)}
+              >
+                <Ionicons
+                  name={c.icon as any}
+                  size={14}
+                  color={category === c.value ? Colors.white : Colors.textSecondary}
+                />
+                <Text style={[fbStyles.catText, category === c.value && fbStyles.catTextActive]}>
+                  {c.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          <Text style={fbStyles.label}>Mensagem</Text>
+          <TextInput
+            style={fbStyles.input}
+            value={message}
+            onChangeText={setMessage}
+            placeholder="Descreva o que observou ou o que gostaria de ver..."
+            placeholderTextColor={Colors.textMuted}
+            multiline
+            numberOfLines={4}
+            maxLength={1000}
+            editable={!sending}
+          />
+          <Text style={fbStyles.charCount}>{message.length}/1000</Text>
+
+          <TouchableOpacity
+            style={[fbStyles.sendBtn, (!message.trim() || sending) && fbStyles.sendBtnDisabled]}
+            onPress={handleSend}
+            disabled={!message.trim() || sending}
+          >
+            {sending ? (
+              <ActivityIndicator size={16} color={Colors.white} />
+            ) : (
+              <>
+                <Ionicons name="send-outline" size={16} color={Colors.white} />
+                <Text style={fbStyles.sendBtnText}>Enviar feedback</Text>
+              </>
+            )}
+          </TouchableOpacity>
+
+          <TouchableOpacity style={fbStyles.cancelBtn} onPress={onClose} disabled={sending}>
+            <Text style={fbStyles.cancelBtnText}>Cancelar</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+const fbStyles = StyleSheet.create({
+  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+  sheet: {
+    backgroundColor: Colors.white,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: Spacing.lg,
+    paddingBottom: 40,
+  },
+  handle: {
+    width: 40, height: 4, borderRadius: 2,
+    backgroundColor: Colors.border,
+    alignSelf: 'center',
+    marginBottom: Spacing.md,
+  },
+  title: { fontSize: FontSize.lg, fontWeight: FontWeight.bold, color: Colors.textPrimary, marginBottom: 4 },
+  sub: { fontSize: FontSize.sm, color: Colors.textMuted, marginBottom: Spacing.md, lineHeight: 18 },
+  label: { fontSize: FontSize.sm, fontWeight: FontWeight.semibold, color: Colors.textPrimary, marginBottom: 6 },
+  categories: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: Spacing.md },
+  catChip: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    paddingHorizontal: 10, paddingVertical: 6,
+    borderRadius: Radii.full, borderWidth: 1, borderColor: Colors.border,
+    backgroundColor: Colors.bgCard,
+  },
+  catChipActive: { backgroundColor: Colors.primary, borderColor: Colors.primary },
+  catText: { fontSize: FontSize.xs, color: Colors.textSecondary, fontWeight: FontWeight.medium },
+  catTextActive: { color: Colors.white },
+  input: {
+    borderWidth: 1, borderColor: Colors.border, borderRadius: Radii.md,
+    padding: Spacing.md, fontSize: FontSize.sm, color: Colors.textPrimary,
+    textAlignVertical: 'top', minHeight: 100,
+    marginBottom: 4,
+  },
+  charCount: { fontSize: FontSize.xs, color: Colors.textMuted, textAlign: 'right', marginBottom: Spacing.md },
+  sendBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
+    backgroundColor: Colors.primary, borderRadius: Radii.xl,
+    paddingVertical: 14, marginBottom: Spacing.sm,
+  },
+  sendBtnDisabled: { opacity: 0.5 },
+  sendBtnText: { fontSize: FontSize.md, fontWeight: FontWeight.bold, color: Colors.white },
+  cancelBtn: { alignItems: 'center', paddingVertical: 10 },
+  cancelBtnText: { fontSize: FontSize.sm, color: Colors.textMuted },
+});
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -137,6 +291,9 @@ export default function ProfileScreen() {
   const [destIsDefault, setDestIsDefault] = useState(false);
   const [destCreating, setDestCreating] = useState(false);
   const [destError, setDestError] = useState<string | null>(null);
+
+  // ── Feedback modal state ──────────────────────────────────────────────────
+  const [showFeedback, setShowFeedback] = useState(false);
 
   // ── Edit destination state ────────────────────────────────────────────────
   const [editingDestId, setEditingDestId] = useState<string | null>(null);
@@ -862,6 +1019,20 @@ export default function ProfileScreen() {
           <Ionicons name="chevron-forward" size={16} color={Colors.textMuted} />
         </TouchableOpacity>
 
+        <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/help' as any)}>
+          <Ionicons name="help-circle-outline" size={20} color={Colors.textSecondary} />
+          <Text style={styles.menuText}>Central de Ajuda</Text>
+          <Ionicons name="chevron-forward" size={16} color={Colors.textMuted} />
+        </TouchableOpacity>
+
+        <TouchableOpacity style={styles.menuItem} onPress={() => setShowFeedback(true)}>
+          <Ionicons name="chatbubble-ellipses-outline" size={20} color={Colors.textSecondary} />
+          <Text style={styles.menuText}>Enviar feedback do beta</Text>
+          <View style={styles.betaChip}>
+            <Text style={styles.betaChipText}>BETA</Text>
+          </View>
+        </TouchableOpacity>
+
         <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/settings' as any)}>
           <Ionicons name="settings-outline" size={20} color={Colors.textSecondary} />
           <Text style={styles.menuText}>Configurações</Text>
@@ -875,7 +1046,17 @@ export default function ProfileScreen() {
         </TouchableOpacity>
       </View>
 
+      {/* Beta banner */}
+      <View style={styles.betaBanner}>
+        <Ionicons name="flask-outline" size={13} color="#92400E" />
+        <Text style={styles.betaBannerText}>
+          Ambiente de teste — nenhum dinheiro real é movimentado.
+        </Text>
+      </View>
+
       <View style={styles.bottomPad} />
+
+      <FeedbackModal visible={showFeedback} onClose={() => setShowFeedback(false)} />
     </ScrollView>
   );
 }
@@ -1467,6 +1648,41 @@ const styles = StyleSheet.create({
     fontWeight: FontWeight.medium,
   },
   menuTextDanger: { color: Colors.danger },
+
+  // ── Beta chip
+  betaChip: {
+    backgroundColor: '#FDE68A',
+    borderRadius: Radii.full,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+  },
+  betaChipText: {
+    fontSize: 10,
+    fontWeight: FontWeight.bold,
+    color: '#92400E',
+    letterSpacing: 0.5,
+  },
+
+  // ── Beta banner
+  betaBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginHorizontal: Spacing.lg,
+    marginTop: Spacing.sm,
+    backgroundColor: '#FFFBEB',
+    borderRadius: Radii.sm,
+    borderLeftWidth: 3,
+    borderLeftColor: '#D97706',
+    paddingVertical: 7,
+    paddingHorizontal: 10,
+  },
+  betaBannerText: {
+    flex: 1,
+    fontSize: FontSize.xs,
+    color: '#78350F',
+    fontWeight: FontWeight.medium,
+  },
 
   bottomPad: { height: Spacing.xl },
 });

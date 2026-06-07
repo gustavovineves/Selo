@@ -1,6 +1,6 @@
 # Progresso do Projeto Selo
 
-Última atualização: 2026-06-07 (Fase 26 — Blockchain como Prova)
+Última atualização: 2026-06-07 (Fase 27 — UX Final e Beta Fechado)
 
 ---
 
@@ -53,6 +53,7 @@
 | Git local | ✅ Limpo após commit da Fase 4 |
 | KYC Progressivo (FinancialProfile, CPF, bloqueio garantia) | ✅ Implementado (Fase 25) |
 | Blockchain como Prova (hash canônico, provider simulated, endpoints /proofs) | ✅ Implementado (Fase 26) |
+| UX Final e Beta Fechado (health público, feedback, Central de Ajuda, admin expandido) | ✅ Implementado (Fase 27) |
 
 ### Estrutura do monorepo
 
@@ -1896,11 +1897,94 @@ Alterações:
 
 ---
 
+## 5u. Fase 27 — UX Final e Beta Fechado (Implementada)
+
+### Objetivo
+
+Polimento final do MVP simulado para beta fechado: linguagem humana, Central de Ajuda, banner de ambiente de teste, feedback beta, admin expandido e documentação de beta.
+
+### Auditoria inicial
+
+- Branch: `main` (limpo, up to date com origin/main)
+- Estado: limpo antes da fase
+- `.env` real: **não rastreado**
+- Fase 26 (Blockchain como Prova): implementada e commitada
+
+### Schema alterado
+
+Não. Nenhuma migration nesta fase.
+
+### Arquivos criados
+
+| Arquivo | Descrição |
+|---|---|
+| `apps/api/src/modules/feedback/dto/create-feedback.dto.ts` | DTO de feedback beta |
+| `apps/api/src/modules/feedback/feedback.service.ts` | Serviço de feedback (log simulado) |
+| `apps/api/src/modules/feedback/feedback.controller.ts` | `GET /health` público + `POST /feedback` |
+| `apps/api/src/modules/feedback/feedback.module.ts` | Módulo de feedback |
+| `apps/mobile/src/services/feedback.service.ts` | Service de feedback mobile |
+| `apps/mobile/app/help.tsx` | Central de Ajuda com 10 FAQs expandíveis |
+| `apps/admin/src/app/users/page.tsx` | Lista de usuários admin com paginação |
+| `apps/admin/src/app/agreements/page.tsx` | Lista de acordos admin com filtros |
+| `apps/admin/src/app/proofs/page.tsx` | Consulta de registros de prova por ID |
+| `docs/beta.md` | Guia completo do beta fechado |
+| `docs/ux-copy.md` | Linguagem aprovada + termos proibidos na UI |
+
+### Arquivos atualizados
+
+| Arquivo | Alteração |
+|---|---|
+| `apps/api/src/app.module.ts` | Import `FeedbackModule` |
+| `apps/mobile/app/(app)/home.tsx` | Banner de beta + aviso sem chave + QuickAction melhorado |
+| `apps/mobile/app/(app)/profile.tsx` | `FeedbackModal`, link Central de Ajuda, banner de beta |
+| `apps/mobile/app/(onboarding)/tutorial.tsx` | 5 slides, indicador dinâmico, banner de beta no último slide |
+| `apps/mobile/app/settings.tsx` | Seção "Ajuda e Suporte" + "Beta Fechado"; inline FAQ removido |
+| `apps/admin/src/components/AdminLayout.tsx` | 5 links de nav (dashboard, contestações, usuários, acordos, provas) |
+| `README.md` | Fase 27 na tabela de concluídas; links docs/beta.md e docs/ux-copy.md |
+| `docs/progresso.md` | Esta seção + data atualizada |
+| `docs/mobile.md` | Estrutura de telas e services atualizada |
+| `docs/admin.md` | Estrutura de páginas admin atualizada |
+
+### Endpoints criados
+
+| Método | Rota | Auth | Descrição |
+|---|---|---|---|
+| GET | `/api/v1/health` | Público | Status da API + modo sandbox |
+| POST | `/api/v1/feedback` | JWT | Feedback beta (log simulado) |
+
+### Checklist de restrições
+
+| Restrição | Status |
+|---|---|
+| Fitbank produção integrado? | **Não** |
+| Pix produção integrado? | **Não** |
+| KYC real integrado? | **Não** |
+| Blockchain real? | **Não** |
+| Chat implementado? | **Não** |
+| CPF exposto sem máscara? | **Não** |
+| dueDate relaxado? | **Não** |
+| Acordo com garantia sem destino? | **Não** |
+| KYC progressivo mantido? | **Sim** |
+| Commit feito? | **Não** |
+
+### Resultados dos testes (rodar antes do commit)
+
+| Comando | Resultado esperado |
+|---|---|
+| `pnpm --filter @selo/api test` | ✅ ≥239 testes, 0 falhas |
+| `pnpm --filter @selo/api test:e2e` | ✅ ≥113 testes, 0 falhas |
+| `pnpm --filter @selo/api build` | ✅ Exit 0 |
+| `pnpm --filter @selo/mobile typecheck` | ✅ Exit 0 |
+| `pnpm --filter @selo/admin typecheck` | ✅ Exit 0 |
+
+---
+
 ## 7. Próxima Fase
 
-Fases sugeridas após Blockchain como Prova (Fase 26), em ordem de prioridade:
+Fases sugeridas após UX Final e Beta Fechado (Fase 27):
 
-- **Fase 27** — UX Final e Beta Fechado: animações, upload de avatar, central de ajuda, polish geral, beta fechado com usuários reais
+- **Fase 28 — Staging/Deploy**: configurar CI/CD, ambiente de staging isolado, GitHub Secrets, banco de staging, AdminUser de staging.
+- **Fase 28 — Beta Fechado Operacional**: convidar usuários reais, coletar feedback, iterar.
 
 Não implementar sem instrução explícita: Fitbank real, blockchain real com private key, KYC real, push notifications reais.
 

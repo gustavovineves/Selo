@@ -9,7 +9,7 @@ import {
 } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { Colors, Spacing, FontSize, FontWeight, Radii } from '../../src/theme';
+import { Colors, Spacing, FontSize, FontWeight, Radii, Shadow } from '../../src/theme';
 
 const SLIDES = [
   {
@@ -32,6 +32,13 @@ const SLIDES = [
     title: 'Contestação formal',
     desc: 'Se algo der errado, você pode contestar formalmente. O valor fica travado e um administrador analisa as evidências para decidir.',
     example: 'Sem chat. Sem briga. Formal e registrado.',
+  },
+  {
+    icon: 'shield-checkmark-outline' as const,
+    color: '#10B981',
+    title: 'Registro de prova',
+    desc: 'Cada evento importante do seu combinado gera um registro de prova imutável. Você pode consultar quando e como tudo aconteceu — para sempre.',
+    example: 'O dinheiro não fica no registro de prova. Ele só prova que o combinado existiu.',
   },
   {
     icon: 'star-outline' as const,
@@ -58,9 +65,9 @@ export default function TutorialScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.topBar}>
-        <Text style={styles.step}>3 de 3</Text>
+        <Text style={styles.step}>{step + 1} de {SLIDES.length}</Text>
         <TouchableOpacity onPress={() => router.replace('/(app)/home')}>
-          <Text style={styles.skipLink}>Pular tudo</Text>
+          <Text style={styles.skipLink}>Pular</Text>
         </TouchableOpacity>
       </View>
 
@@ -84,6 +91,16 @@ export default function TutorialScreen() {
         <View style={styles.exampleBox}>
           <Text style={styles.exampleText}>{slide.example}</Text>
         </View>
+
+        {isLast && (
+          <View style={styles.betaBanner}>
+            <Ionicons name="flask-outline" size={14} color="#92400E" />
+            <Text style={styles.betaText}>
+              Você está no <Text style={styles.betaBold}>beta fechado</Text> — ambiente de teste.
+              Nenhum dinheiro real é movimentado.
+            </Text>
+          </View>
+        )}
       </ScrollView>
 
       <View style={styles.footer}>
@@ -210,4 +227,23 @@ const styles = StyleSheet.create({
     fontWeight: FontWeight.bold,
     color: Colors.white,
   },
+  betaBanner: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    backgroundColor: '#FFFBEB',
+    borderRadius: Radii.md,
+    borderLeftWidth: 3,
+    borderLeftColor: '#D97706',
+    padding: Spacing.md,
+    marginTop: Spacing.lg,
+    alignSelf: 'stretch',
+  },
+  betaText: {
+    flex: 1,
+    fontSize: FontSize.xs,
+    color: '#78350F',
+    lineHeight: 17,
+  },
+  betaBold: { fontWeight: FontWeight.bold },
 });

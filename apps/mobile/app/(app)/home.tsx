@@ -216,6 +216,28 @@ export default function HomeScreen() {
           </View>
         )}
 
+        {/* Banner de ambiente de teste */}
+        <View style={styles.betaBanner}>
+          <Ionicons name="flask-outline" size={13} color="#92400E" />
+          <Text style={styles.betaText}>
+            Ambiente de teste — nenhum dinheiro real é movimentado.
+          </Text>
+        </View>
+
+        {/* Aviso: sem chave de recebimento */}
+        {!receivingKey && !loading && (
+          <TouchableOpacity
+            style={styles.noKeyBanner}
+            onPress={() => router.push('/(app)/profile')}
+            activeOpacity={0.85}
+          >
+            <Ionicons name="key-outline" size={16} color={Colors.primary} />
+            <Text style={styles.noKeyText}>
+              Configure sua Chave de Recebimento para criar combinados →
+            </Text>
+          </TouchableOpacity>
+        )}
+
         {/* Quick actions */}
         <View style={styles.quickRow}>
           <QuickAction
@@ -230,12 +252,19 @@ export default function HomeScreen() {
             color={Colors.info}
             onPress={() => router.push('/(app)/agreements')}
           />
-          {receivingKey && (
+          {receivingKey ? (
             <QuickAction
               icon="share-social"
               label="Minha chave"
               color={Colors.accent}
               onPress={() => handleShareKey(receivingKey.key)}
+            />
+          ) : (
+            <QuickAction
+              icon="key-outline"
+              label="Criar chave"
+              color={Colors.accent}
+              onPress={() => router.push('/(app)/profile')}
             />
           )}
         </View>
@@ -451,6 +480,44 @@ const styles = StyleSheet.create({
     borderRadius: Radii.lg,
     marginBottom: Spacing.sm,
     ...Shadow.sm,
+  },
+  betaBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#FFFBEB',
+    borderLeftWidth: 3,
+    borderLeftColor: '#D97706',
+    marginHorizontal: Spacing.lg,
+    marginTop: Spacing.sm,
+    borderRadius: Radii.sm,
+    paddingVertical: 7,
+    paddingHorizontal: 10,
+  },
+  betaText: {
+    flex: 1,
+    fontSize: FontSize.xs,
+    color: '#78350F',
+    fontWeight: FontWeight.medium,
+  },
+  noKeyBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: Colors.primaryGlow,
+    marginHorizontal: Spacing.lg,
+    marginTop: Spacing.sm,
+    borderRadius: Radii.md,
+    paddingVertical: 10,
+    paddingHorizontal: Spacing.md,
+    borderWidth: 1,
+    borderColor: Colors.primary + '30',
+  },
+  noKeyText: {
+    flex: 1,
+    fontSize: FontSize.sm,
+    color: Colors.primary,
+    fontWeight: FontWeight.medium,
   },
   bottomPad: { height: Spacing.xl },
 });

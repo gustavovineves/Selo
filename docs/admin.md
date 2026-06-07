@@ -110,15 +110,21 @@ apps/admin/
 │   │   ├── layout.tsx              # Root layout com reset CSS
 │   │   ├── page.tsx                # Redirect para /login ou /dashboard
 │   │   ├── login/
-│   │   │   └── page.tsx            # Tela de login com token
+│   │   │   └── page.tsx            # Tela de login AdminUser + JWT
 │   │   ├── dashboard/
 │   │   │   └── page.tsx            # Dashboard com estatísticas gerais
-│   │   └── disputes/
-│   │       ├── page.tsx            # Lista de contestações com filtros
-│   │       └── [id]/
-│   │           └── page.tsx        # Detalhe + ações administrativas
+│   │   ├── disputes/
+│   │   │   ├── page.tsx            # Lista de contestações com filtros
+│   │   │   └── [id]/
+│   │   │       └── page.tsx        # Detalhe + ações administrativas
+│   │   ├── users/
+│   │   │   └── page.tsx            # Lista de usuários com paginação (Fase 27)
+│   │   ├── agreements/
+│   │   │   └── page.tsx            # Lista de acordos com filtros (Fase 27)
+│   │   └── proofs/
+│   │       └── page.tsx            # Consulta de registros de prova por ID (Fase 27)
 │   ├── components/
-│   │   ├── AdminLayout.tsx         # Sidebar + navegação principal
+│   │   ├── AdminLayout.tsx         # Sidebar com 5 links de navegação (Fase 27)
 │   │   ├── Modal.tsx               # Modal de confirmação reutilizável
 │   │   └── StatusBadge.tsx         # Badge de status com cores semânticas
 │   └── lib/

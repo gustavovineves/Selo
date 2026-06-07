@@ -218,101 +218,38 @@ export default function SettingsScreen() {
         )}
 
         {/* ── Ajuda ─────────────────────────────────────────────────── */}
-        <TouchableOpacity
-          style={styles.sectionHeaderBtn}
-          onPress={() => toggle('help')}
-          activeOpacity={0.8}
-        >
-          <SectionHeader title="Ajuda" />
-          <Ionicons
-            name={expanded === 'help' ? 'chevron-up' : 'chevron-down'}
-            size={16}
-            color={Colors.textMuted}
+        <SectionHeader title="Ajuda e Suporte" />
+        <View style={styles.card}>
+          <MenuItem
+            icon="help-circle-outline"
+            label="Central de Ajuda"
+            onPress={() => router.push('/help' as any)}
           />
-        </TouchableOpacity>
+          <MenuItem
+            icon="document-text-outline"
+            label="Termos de Uso"
+            badge="Em breve"
+          />
+          <MenuItem
+            icon="lock-closed-outline"
+            label="Política de Privacidade"
+            badge="Em breve"
+          />
+        </View>
 
-        {expanded === 'help' && (
-          <View style={styles.card}>
-
-            <View style={styles.helpItem}>
-              <View style={styles.helpIconRow}>
-                <Ionicons name="document-text-outline" size={18} color={Colors.primary} />
-                <Text style={styles.helpTitle}>O que é um combinado simples?</Text>
-              </View>
-              <Text style={styles.helpDesc}>
-                Um combinado simples é um acordo registrado entre duas pessoas, com prazo e
-                histórico formal. Não envolve dinheiro — serve para formalizar qualquer tipo de
-                compromisso: empréstimos, serviços, tarefas, promessas.
-              </Text>
-            </View>
-
-            <View style={styles.separator} />
-
-            <View style={styles.helpItem}>
-              <View style={styles.helpIconRow}>
-                <Ionicons name="lock-closed-outline" size={18} color={Colors.accent} />
-                <Text style={styles.helpTitle}>O que é valor protegido?</Text>
-              </View>
-              <Text style={styles.helpDesc}>
-                Em acordos com garantia, o pagador deposita o valor via Pix. O dinheiro fica
-                guardado até que ambas as partes confirmem que o combinado foi cumprido. Só então
-                o valor é liberado ao recebedor.{'\n\n'}
-                Se uma das partes não concordar com o resultado, pode abrir uma contestação formal.
-                O valor fica travado até a resolução.
-              </Text>
-            </View>
-
-            <View style={styles.separator} />
-
-            <View style={styles.helpItem}>
-              <View style={styles.helpIconRow}>
-                <Ionicons name="alert-circle-outline" size={18} color={Colors.warning} />
-                <Text style={styles.helpTitle}>Como funciona a contestação?</Text>
-              </View>
-              <Text style={styles.helpDesc}>
-                A contestação no Selo é um registro formal — não é um chat ou briga. Ao contestar,
-                você informa o motivo e pode enviar evidências (documentos, textos objetivos).
-                Um administrador analisa as informações e decide quem recebe o valor.{'\n\n'}
-                Não existe negociação direta entre as partes após aberta a contestação.
-              </Text>
-            </View>
-
-            <View style={styles.separator} />
-
-            <View style={styles.helpItem}>
-              <View style={styles.helpIconRow}>
-                <Ionicons name="at-outline" size={18} color={Colors.primary} />
-                <Text style={styles.helpTitle}>Chave de Recebimento ≠ chave Pix</Text>
-              </View>
-              <Text style={styles.helpDesc}>
-                Sua <Text style={{ fontWeight: '600' }}>Chave de Recebimento do App</Text> (como
-                @seunome) é um endereço interno do Selo. Serve para outras pessoas te encontrarem
-                e criarem acordos com você.{'\n\n'}
-                É diferente da sua chave Pix real (CPF, e-mail, telefone ou chave aleatória) que
-                você usa no seu banco. O Selo não acessa, valida ou armazena sua chave Pix real
-                — apenas a chave do Destino de Recebimento (mascarada e simulada em dev).
-              </Text>
-            </View>
-
-            <View style={styles.separator} />
-
-            <View style={styles.helpItem}>
-              <View style={styles.helpIconRow}>
-                <Ionicons name="star-outline" size={18} color={Colors.warning} />
-                <Text style={styles.helpTitle}>Como funciona o score de confiança?</Text>
-              </View>
-              <Text style={styles.helpDesc}>
-                O score começa em 500 e evolui com base no seu histórico:{'\n'}
-                • Combinados concluídos: +20 pontos{'\n'}
-                • Disputas ganhas: +30 pontos{'\n'}
-                • Cancelamentos: −10 pontos{'\n'}
-                • Disputas perdidas: −20 pontos{'\n\n'}
-                Acesse seu perfil para ver o score detalhado e o que cada nível significa.
-              </Text>
-            </View>
-
-          </View>
-        )}
+        {/* ── Beta ──────────────────────────────────────────────────── */}
+        <SectionHeader title="Beta Fechado" />
+        <View style={styles.card}>
+          <InfoBox
+            icon="flask-outline"
+            text="Você está no beta fechado do Selo. Nenhum dinheiro real é movimentado. Tudo que você faz aqui é para testar a experiência do produto."
+          />
+          <MenuItem
+            icon="chatbubble-ellipses-outline"
+            label="Enviar feedback do beta"
+            onPress={() => router.push('/(app)/profile' as any)}
+          />
+        </View>
 
         <View style={{ height: 48 }} />
       </ScrollView>

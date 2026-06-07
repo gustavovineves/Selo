@@ -13,46 +13,63 @@ apps/mobile/
 ├── app/
 │   ├── _layout.tsx            # Root layout (SafeAreaProvider + Stack)
 │   ├── index.tsx              # Auth check — redireciona para (auth) ou (app)
+│   ├── help.tsx               # Central de Ajuda / FAQ (Fase 27)
+│   ├── settings.tsx           # Configurações + ajuda + beta
+│   ├── financial-verification.tsx  # Verificação financeira (KYC simulado)
+│   ├── search.tsx             # Busca de usuários e acordos
+│   ├── trust-score.tsx        # Detalhe do score de confiança
+│   ├── edit-profile.tsx       # Edição de perfil
 │   ├── (auth)/
 │   │   ├── _layout.tsx        # Stack sem header
-│   │   ├── login.tsx          # Tela de login com formulário real
-│   │   └── register.tsx       # Tela de cadastro com formulário real
-│   └── (app)/
-│       ├── _layout.tsx        # Bottom Tabs com botão Criar flutuante
-│       ├── home.tsx           # Home Wallet
-│       ├── agreements.tsx     # Lista de combinados com filtros
-│       ├── create.tsx         # Criar combinado (placeholder)
-│       └── profile.tsx        # Perfil do usuário
+│   │   ├── login.tsx          # Tela de login
+│   │   └── register.tsx       # Tela de cadastro (sem CPF)
+│   ├── (onboarding)/
+│   │   ├── welcome.tsx        # Tela de boas-vindas
+│   │   ├── setup-key.tsx      # Setup da Chave de Recebimento
+│   │   └── tutorial.tsx       # Tutorial de 5 slides com indicador de progresso (Fase 27)
+│   ├── (app)/
+│   │   ├── _layout.tsx        # Bottom Tabs com botão Criar flutuante
+│   │   ├── home.tsx           # Home Wallet + banner de beta (Fase 27)
+│   │   ├── agreements.tsx     # Lista de combinados com filtros
+│   │   ├── create.tsx         # Criar combinado
+│   │   ├── notifications.tsx  # Central de notificações
+│   │   └── profile.tsx        # Perfil + modal de feedback beta (Fase 27)
+│   └── agreement/
+│       └── [id].tsx           # Detalhe do acordo + provas
 ├── src/
 │   ├── theme/
 │   │   └── index.ts           # Cores, espaçamentos, bordas, sombras, tipografia
 │   ├── types/
-│   │   ├── api.ts             # Tipos de resposta da API (alinhados com backend)
+│   │   ├── api.ts             # Tipos de resposta da API
 │   │   └── navigation.ts      # Parâmetros de navegação
 │   ├── services/
-│   │   ├── api.ts             # Cliente HTTP base (fetch + SecureStore)
-│   │   ├── auth.service.ts    # Login, register, logout, getMe
-│   │   ├── agreements.service.ts # CRUD de combinados
-│   │   ├── wallet.service.ts  # GET /agreements/summary
-│   │   ├── receiving-keys.service.ts     # Chaves de recebimento
-│   │   └── receiving-destinations.service.ts # Destinos de recebimento
+│   │   ├── api.ts             # Cliente HTTP base
+│   │   ├── auth.service.ts
+│   │   ├── agreements.service.ts  # inclui getProofs()
+│   │   ├── wallet.service.ts
+│   │   ├── receiving-keys.service.ts
+│   │   ├── receiving-destinations.service.ts
+│   │   ├── users.service.ts
+│   │   ├── payments.service.ts
+│   │   ├── disputes.service.ts
+│   │   └── feedback.service.ts    # Feedback beta simulado (Fase 27)
 │   ├── hooks/
-│   │   ├── useAuth.ts         # Login/register/logout com navigation
-│   │   ├── useAuthState.ts    # Verifica token em SecureStore
-│   │   ├── useAgreements.ts   # Listagem com filtros
-│   │   ├── useSummary.ts      # Home wallet summary
-│   │   └── useProfile.ts      # Perfil + chave + destino (Promise.allSettled)
+│   │   ├── useAuth.ts
+│   │   ├── useAuthState.ts
+│   │   ├── useAgreements.ts
+│   │   ├── useSummary.ts
+│   │   └── useProfile.ts
 │   └── components/
-│       ├── index.ts           # Re-exports
-│       ├── StatusBadge.tsx    # Badge de status (operacional + financeiro)
-│       ├── AgreementCard.tsx  # Card de acordo — suporta AgreementSummaryItem e AgreementListItem
-│       ├── EmptyState.tsx     # Estado vazio com ícone e mensagem
-│       ├── LoadingState.tsx   # Spinner + SkeletonCard simplificado
-│       ├── PrimaryButton.tsx  # Botão com variants: primary, secondary, ghost, danger
-│       ├── FinancialCard.tsx  # Card de valor (a receber, a pagar, protegido)
-│       └── SectionHeader.tsx  # Cabeçalho de seção com badge de contador
-├── expo-env.d.ts              # Declaração global de process.env.EXPO_PUBLIC_*
-└── package.json               # @expo/vector-icons adicionado na Fase 9
+│       ├── index.ts
+│       ├── StatusBadge.tsx
+│       ├── AgreementCard.tsx
+│       ├── EmptyState.tsx
+│       ├── LoadingState.tsx
+│       ├── PrimaryButton.tsx
+│       ├── FinancialCard.tsx
+│       └── SectionHeader.tsx
+├── expo-env.d.ts
+└── package.json
 ```
 
 ---

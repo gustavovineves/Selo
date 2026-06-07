@@ -92,6 +92,8 @@ pnpm dev:mobile
 - [Ambientes e Segurança](docs/environments.md)
 - [Verificação Financeira (KYC Progressivo)](docs/financial-verification.md)
 - [Blockchain como Prova (Fase 26)](docs/blockchain-proof.md)
+- [Beta Fechado](docs/beta.md)
+- [Linguagem e UX Copy](docs/ux-copy.md)
 
 ---
 
@@ -112,12 +114,13 @@ pnpm dev:mobile
 | Fase 24 | ✅ Concluído | Fitbank Sandbox / Pix Sandbox: IPaymentProvider, SimulatedProvider, FitbankSandboxProvider, webhook endpoint, 179 testes unitários, 92 E2E |
 | Fase 25 | ✅ Concluído | KYC Progressivo: verificação financeira sob demanda, FinancialProfile, CPF validado, bloqueio em acordo com garantia, 206 testes unitários, 101 E2E |
 | Fase 26 | ✅ Concluído | Blockchain como Prova: IBlockchainProofProvider, SimulatedProvider, hash canônico SHA-256, sanitização de dados sensíveis, endpoints /proofs, seção mobile, 239 testes unitários, 113 E2E |
+| Fase 27 | ✅ Concluído | UX Final e Beta Fechado: health público, feedback beta, Central de Ajuda, banner sandbox, onboarding com 5 slides, modal de feedback, admin (usuários/acordos/provas), docs/beta.md, docs/ux-copy.md |
 
 ## Próximas Etapas (não implementadas)
 
 | Fase | Descrição |
 |------|-----------|
-| Fase 27 | UX Final e Beta Fechado |
+| Fase 28 | Staging/Deploy ou Beta Fechado Operacional |
 
 ---
 
