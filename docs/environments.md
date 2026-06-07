@@ -48,6 +48,13 @@
 | `APP_PUBLIC_URL` | — | URL pública do frontend | — |
 | `API_PUBLIC_URL` | — | URL pública da API | — |
 | `ADMIN_TOKEN` | — | Token estático legado (AdminTokenGuard — deprecated) | — |
+| `PAYMENT_PROVIDER` | — | `simulated` ou `fitbank_sandbox` (padrão: `simulated`) | ✅ |
+| `FITBANK_ENV` | — | `sandbox` ou `production` (padrão: `sandbox`) | ✅ |
+| `FITBANK_ENABLE_REAL_CALLS` | — | `false` — NUNCA mudar para `true` sem instrução explícita | ✅ `false` |
+| `FITBANK_CLIENT_ID` | — | Client ID Fitbank sandbox (Fase 24+) | ✅ fake |
+| `FITBANK_CLIENT_SECRET` | — | Client Secret Fitbank sandbox (Fase 24+) | ✅ fake |
+| `FITBANK_WEBHOOK_SECRET` | — | Secret para validação HMAC do webhook (Fase 24+) | ✅ fake |
+| `FITBANK_PIX_KEY` | — | Chave Pix Fitbank sandbox (Fase 24+) | ✅ fake |
 
 ### 3.2 Admin Web (`apps/admin`)
 
@@ -178,7 +185,49 @@ O `AdminTokenGuard` (guard de token estático via header `X-Admin-Token`) ainda 
 
 ---
 
-## 10. Setup de Staging (Preparação — Fase Futura)
+## 10. Fitbank Sandbox e Provedor de Pagamento (Fase 24)
+
+O Selo abstrai o provedor financeiro via `IPaymentProvider`. O provider ativo é selecionado por `PAYMENT_PROVIDER`.
+
+### Diferença entre os modos
+
+| Modo | Provider | Chamada real | Webhook |
+|---|---|---|---|
+| `simulated` (padrão) | `SimulatedPaymentProvider` | Nunca | `POST /payments/:id/simulate-confirmation` |
+| `fitbank_sandbox` | `FitbankSandboxPaymentProvider` | Nunca (enquanto `FITBANK_ENABLE_REAL_CALLS=false`) | `POST /api/v1/payments/webhooks/fitbank` |
+| produção futura | Fitbank real | Sim | Webhook Fitbank real |
+
+### O que o dinheiro representa em cada modo
+
+| Modo | Status financeiro real |
+|---|---|
+| `simulated` | Nenhum — apenas estado interno no banco do Selo |
+| `fitbank_sandbox` | Nenhum — sandbox sem movimentação real |
+| Produção | Fundos custodiados no Fitbank — o Selo orquestra, não custodia |
+
+### Regras absolutas desta fase
+
+- `FITBANK_ENABLE_REAL_CALLS` nunca pode ser `true` sem instrução explícita
+- Nenhuma chamada HTTP ao Fitbank real é feita nesta fase
+- O dinheiro permanece em reais, custodiado pelo parceiro financeiro (futuro)
+- O Selo orquestra acordo, regra, status, prova e reputação — não guarda dinheiro
+- A blockchain registra prova (hash), não movimenta dinheiro
+- A Chave de Recebimento do App (`@usuario`) não é chave Pix
+- O Destino de Recebimento é separado da Chave de Recebimento
+
+### Como testar webhook sandbox localmente
+
+```bash
+# 1. Criar PaymentIntent (pegar txid da resposta)
+# 2. Enviar webhook fake para o endpoint sandbox:
+curl -X POST http://localhost:3000/api/v1/payments/webhooks/fitbank \
+  -H "Content-Type: application/json" \
+  -d '{"event":"PIX_PAYMENT_CONFIRMED","txid":"<txid>","amount":"350.00"}'
+```
+
+---
+
+## 11. Setup de Staging (Preparação — Fase Futura)
 
 Para criar um ambiente de staging:
 
@@ -197,7 +246,7 @@ Para criar um ambiente de staging:
 
 ---
 
-## 11. .gitignore
+## 12. .gitignore
 
 Verifique se o `.gitignore` da raiz inclui:
 

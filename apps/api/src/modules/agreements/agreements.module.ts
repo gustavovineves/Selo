@@ -7,6 +7,7 @@ import { BlockchainRecordsModule } from '../blockchain-records/blockchain-record
 import { FinancialGuaranteesModule } from '../financial-guarantees/financial-guarantees.module';
 import { ReceivingDestinationsModule } from '../receiving-destinations/receiving-destinations.module';
 import { NotificationsModule } from '../notifications/notifications.module';
+import { PaymentsModule } from '../payments/payments.module';
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { NotificationsModule } from '../notifications/notifications.module';
     FinancialGuaranteesModule,
     ReceivingDestinationsModule,
     NotificationsModule,
+    PaymentsModule,
   ],
   controllers: [AgreementsController],
   providers: [AgreementsService],

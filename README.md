@@ -107,12 +107,12 @@ pnpm dev:mobile
 | Fase 21 | ✅ Concluído | Adequação integral ao documento de visão: onboarding, busca, score, configurações, blockchain em mais eventos, admin completo |
 | Fase 22 | ✅ Concluído | CI/GitHub Actions: workflow automático em push/PR — testes unitários, E2E com PostgreSQL, build, typecheck mobile e admin |
 | Fase 23 | ✅ Concluído | Ambientes e Segurança: ThrottlerModule, CORS por ambiente, GlobalExceptionFilter, validateEnv, docs/environments.md |
+| Fase 24 | ✅ Concluído | Fitbank Sandbox / Pix Sandbox: IPaymentProvider, SimulatedProvider, FitbankSandboxProvider, webhook endpoint, 179 testes unitários, 92 E2E |
 
 ## Próximas Etapas (não implementadas)
 
 | Fase | Descrição |
 |------|-----------|
-| Fase 24 | Fitbank Sandbox / Pix Sandbox |
 | Fase 25 | KYC Progressivo |
 | Fase 26 | Blockchain Testnet como Prova |
 | Fase 27 | UX Final e Beta Fechado |

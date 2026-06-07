@@ -47,6 +47,13 @@ jobs:
       # Rate limit alto em CI para não bloquear testes de carga ou E2E
       RATE_LIMIT_TTL: 60000
       RATE_LIMIT_MAX: 10000
+      # Pagamento — usar simulado em CI; sandbox Fitbank requer credenciais reais
+      PAYMENT_PROVIDER: simulated
+      FITBANK_ENV: sandbox
+      FITBANK_ENABLE_REAL_CALLS: 'false'
+      FITBANK_CLIENT_ID: ci-fitbank-client-fake
+      FITBANK_CLIENT_SECRET: ci-fitbank-secret-fake
+      FITBANK_WEBHOOK_SECRET: ci-fitbank-webhook-secret-fake
 
     steps:
       - name: Checkout

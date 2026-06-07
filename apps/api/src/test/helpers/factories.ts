@@ -347,7 +347,7 @@ export function createPrismaMock() {
     paymentIntent: {
       findUnique: fn(), findFirst: fn(), create: fn(), update: fn(), findMany: fn(),
     },
-    pixCharge: { create: fn(), update: fn() },
+    pixCharge: { findUnique: fn(), findFirst: fn(), create: fn(), update: fn() },
     payout: { findFirst: fn(), create: fn(), update: fn() },
     refund: { findFirst: fn(), create: fn(), update: fn() },
     dispute: {

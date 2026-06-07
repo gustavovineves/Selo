@@ -506,6 +506,33 @@ A Fase 23 adicionou segurança operacional ao CI e ao backend. Os 238 testes **c
 
 ---
 
+## CI — Fase 24 (Fitbank Sandbox / Pix Sandbox)
+
+A Fase 24 adicionou a camada de provider de pagamento sandbox e o endpoint de webhook. Os 179 testes unitários e os 92 testes E2E passam sem modificação nos testes anteriores.
+
+### Testes adicionados
+
+| Arquivo | Testes adicionados |
+|---|---|
+| `src/modules/payments/providers/payment-providers.spec.ts` | **19 testes** — SimulatedPaymentProvider e FitbankSandboxPaymentProvider |
+| `src/modules/payments/payments.service.spec.ts` | **+6 testes** (handleFitbankWebhook) — total 12 testes no arquivo |
+| `test/e2e/mvp-flow.e2e-spec.ts` | **+9 testes** (bloco Fase 24 — webhook sandbox com banco real) |
+
+**Totais após Fase 24:** 179 testes unitários (11 suítes), 92 testes E2E (1 suíte), build ✅, mobile typecheck ✅, admin typecheck ✅.
+
+### Vars adicionadas ao CI (`.github/workflows/ci.yml`)
+
+| Variável | Valor no CI | Motivo |
+|---|---|---|
+| `PAYMENT_PROVIDER` | `simulated` | Usa provider simulado em CI (sem credenciais reais) |
+| `FITBANK_ENV` | `sandbox` | Ambiente informativo |
+| `FITBANK_ENABLE_REAL_CALLS` | `false` | Garante que nenhuma chamada real é feita |
+| `FITBANK_CLIENT_ID` | fake | Valor placeholder — sem acesso real |
+| `FITBANK_CLIENT_SECRET` | fake | Valor placeholder — sem acesso real |
+| `FITBANK_WEBHOOK_SECRET` | fake | Usado para testes de validação de assinatura |
+
+---
+
 ## Próximos Passos Recomendados
 
 1. **Cobertura dos caminhos felizes de release/refund** — atualmente cobertos em manuais
@@ -513,6 +540,7 @@ A Fase 23 adicionou segurança operacional ao CI e ao backend. Os 238 testes **c
 3. **Threshold de cobertura** — definir `coverageThreshold` no jest config após estabilizar
 4. **Cache de imagem Docker no CI** — evitar download repetido do `postgres:16-alpine`
 5. **Testes E2E via HTTP** — usar `supertest` para cobrir rate limiting e filtro global
+6. **Testes para provider fitbank_sandbox com PAYMENT_PROVIDER=fitbank_sandbox** — cobrir factory selection em E2E quando credenciais sandbox forem disponibilizadas
 
 ---
 

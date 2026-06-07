@@ -1,6 +1,6 @@
 # Progresso do Projeto Selo
 
-Última atualização: 2026-06-06 (Fase 23 — Ambientes e Segurança)
+Última atualização: 2026-06-06 (Fase 24 — Fitbank Sandbox / Pix Sandbox)
 
 ---
 
@@ -1545,11 +1545,126 @@ Preparar o projeto para operar com segurança mínima em development, test, stag
 
 ---
 
+## 5r. Fase 24 — Fitbank Sandbox / Pix Sandbox (Implementada)
+
+### Objetivo
+
+Criar uma camada de abstração para o provedor financeiro, preparar o endpoint de webhook sandbox e estruturar o projeto para troca futura por integração Fitbank real — sem movimentar dinheiro real.
+
+### Branch e estado do repositório
+
+- Branch: `dev`
+- Estado: limpo antes da fase
+- `.env` real: **não rastreado**
+- Dinheiro real movimentado: **Não**
+- Chamada real ao Fitbank: **Não**
+
+### Arquivos criados
+
+| Arquivo | Descrição |
+|---|---|
+| `apps/api/src/modules/payments/providers/payment-provider.interface.ts` | Interface `IPaymentProvider` + token de DI `PAYMENT_PROVIDER_TOKEN` |
+| `apps/api/src/modules/payments/providers/simulated-payment.provider.ts` | Provider simulado — comportamento atual, sem chamada real |
+| `apps/api/src/modules/payments/providers/fitbank-sandbox-payment.provider.ts` | Provider sandbox Fitbank — sem chamada real (`FITBANK_ENABLE_REAL_CALLS=false`) |
+| `apps/api/src/modules/payments/dto/fitbank-webhook.dto.ts` | DTO do webhook Fitbank |
+| `apps/api/src/modules/payments/providers/payment-providers.spec.ts` | 19 testes unitários dos providers |
+
+### Arquivos atualizados
+
+| Arquivo | Alteração |
+|---|---|
+| `apps/api/src/modules/payments/payments.module.ts` | Factory do provider (por env), exporta `PAYMENT_PROVIDER_TOKEN` |
+| `apps/api/src/modules/payments/payments.service.ts` | `handleFitbankWebhook` com idempotência, validação de assinatura, BlockchainRecord, notificações |
+| `apps/api/src/modules/payments/payments.controller.ts` | `POST /payments/webhooks/fitbank` (endpoint público, sem JWT) |
+| `apps/api/src/modules/payments/payments.service.spec.ts` | +6 testes de webhook (total 12 no arquivo) |
+| `apps/api/src/modules/agreements/agreements.service.ts` | `initiatePayment` usa provider injetado; retorna `instructions` |
+| `apps/api/src/modules/agreements/agreements.module.ts` | Importa `PaymentsModule` para injetar `PAYMENT_PROVIDER_TOKEN` |
+| `apps/api/src/modules/agreements/agreements.service.spec.ts` | Mock do `PAYMENT_PROVIDER_TOKEN` adicionado |
+| `apps/api/src/test/helpers/factories.ts` | `pixCharge.findUnique` e `pixCharge.findFirst` adicionados ao mock |
+| `apps/api/test/e2e/mvp-flow.e2e-spec.ts` | Bloco "Fase 24 — Webhook Fitbank Sandbox" (+9 testes E2E) |
+| `.env.example` | Vars sandbox: `PAYMENT_PROVIDER`, `FITBANK_ENV`, `FITBANK_ENABLE_REAL_CALLS`, `FITBANK_*` |
+| `apps/api/.env.example` | Idem |
+| `.github/workflows/ci.yml` | `PAYMENT_PROVIDER=simulated`, `FITBANK_ENABLE_REAL_CALLS=false`, vars fake |
+| `docs/payments.md` | Seção de providers, webhook sandbox, tabela atualizada |
+| `docs/guaranteed-agreements.md` | Seção de ambiente atualizada para múltiplos providers |
+| `docs/environments.md` | Vars sandbox na tabela da API; seção 10 completa sobre Fitbank Sandbox |
+| `docs/tests.md` | Seção CI — Fase 24 com testes adicionados |
+| `docs/progresso.md` | Esta seção |
+| `README.md` | Fase 24 na tabela de fases concluídas |
+
+### Provider financeiro
+
+| Aspecto | Valor |
+|---|---|
+| Interface | `IPaymentProvider` — `createPixCharge`, `validateWebhookSignature`, `parseWebhookPayload` |
+| Provider padrão | `SimulatedPaymentProvider` (`PAYMENT_PROVIDER=simulated`) |
+| Provider sandbox | `FitbankSandboxPaymentProvider` (`PAYMENT_PROVIDER=fitbank_sandbox`) |
+| Chamada real ao Fitbank? | **Não** — `FITBANK_ENABLE_REAL_CALLS=false` em todos os ambientes desta fase |
+| Dinheiro real? | **Não** — fluxo inteiro simulado internamente |
+
+### Fluxo Pix sandbox
+
+```
+POST /agreements/:id/payment-intents
+    → provider.createPixCharge() — retorna QR Code sandbox + instructions
+    → PaymentIntent criado com metadata.provider = SIMULATED | FITBANK_SANDBOX
+
+POST /payments/webhooks/fitbank  (ou simulate-confirmation)
+    → provider.validateWebhookSignature()
+    → provider.parseWebhookPayload()
+    → eventType=PIX_CONFIRMED: PaymentIntent→PAID, Guarantee→LOCKED, financialStatus→FUNDS_HELD
+    → BlockchainRecord PENDING + Notificação + AuditLog
+    → Idempotente: webhook duplicado ignorado
+```
+
+### Status financeiros
+
+| Status | Exibição para o usuário |
+|---|---|
+| `AWAITING_PAYMENT` | "Aguardando pagamento" |
+| `FUNDS_HELD` | "Valor protegido" |
+| `PAID_OUT` | "Pagamento liberado" |
+| `REFUNDED` | "Reembolsado" |
+| `DISPUTED` | "Travado por contestação" |
+
+### Resultados dos comandos locais
+
+| Comando | Resultado |
+|---|---|
+| `pnpm --filter @selo/api test` | ✅ **179 testes, 11 suítes, 0 falhas** |
+| `pnpm --filter @selo/api test:e2e` | ✅ **92 testes, 1 suíte, 0 falhas** |
+| `pnpm --filter @selo/api build` | ✅ Exit 0 |
+| `pnpm --filter @selo/mobile typecheck` | ✅ Exit 0 |
+| `pnpm --filter @selo/admin typecheck` | ✅ Exit 0 |
+
+### Confirmações obrigatórias
+
+| Restrição | Status |
+|---|---|
+| Schema Prisma alterado? | **Não** |
+| Migration rodada? | **Não** |
+| Fitbank real integrado? | **Não** |
+| Pix real implementado? | **Não** |
+| Webhook real de produção? | **Não** |
+| Payout real? | **Não** |
+| Refund real? | **Não** |
+| Blockchain real? | **Não** |
+| KYC? | **Não** |
+| Chat? | **Não** |
+| Dinheiro real movimentado? | **Não** |
+| Chamada HTTP real ao Fitbank? | **Não** |
+| Segredo real exposto? | **Não** |
+| Testes removidos para passar? | **Não** |
+| dueDate continua obrigatório? | **Sim** |
+| Acordo com garantia exige destino ativo? | **Sim** |
+| Commit feito? | **Não** |
+
+---
+
 ## 7. Próxima Fase
 
-Fases sugeridas após Ambientes e Segurança (Fase 23), em ordem de prioridade:
+Fases sugeridas após Fitbank Sandbox (Fase 24), em ordem de prioridade:
 
-- **Fase 24** — Fitbank Sandbox / Pix Sandbox: substituição do `simulate-confirmation` por webhook real de sandbox
 - **Fase 25** — KYC Progressivo: onboarding financeiro com CPF e validação do Banco Central
 - **Fase 26** — Blockchain Testnet: registro de hash de acordos em Ethereum/Polygon testnet
 - **Fase 27** — UX Final e Beta Fechado: animações, upload de avatar, polish geral

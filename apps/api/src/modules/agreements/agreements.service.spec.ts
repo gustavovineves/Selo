@@ -22,6 +22,7 @@ import {
   makeFinancialGuarantee,
   makeParticipant,
 } from '../../test/helpers/factories';
+import { PAYMENT_PROVIDER_TOKEN } from '../payments/providers/payment-provider.interface';
 
 describe('AgreementsService', () => {
   let service: AgreementsService;
@@ -55,6 +56,22 @@ describe('AgreementsService', () => {
       maskValue: jest.fn().mockReturnValue('e***@test.com'),
     };
 
+    const mockPaymentProvider = {
+      providerName: 'SIMULATED',
+      createPixCharge: jest.fn().mockReturnValue({
+        txid: 'test-txid-001',
+        pixKey: 'SELO-PLATFORM@DEV.LOCAL',
+        pixKeyType: 'RANDOM',
+        qrCode: '000201test-qr-code',
+        rawRequest: { simulated: true },
+        rawResponse: { txid: 'test-txid-001', status: 'ACTIVE' },
+        instructions: 'Ambiente de desenvolvimento: use o botão de simulação.',
+        providerName: 'SIMULATED',
+      }),
+      validateWebhookSignature: jest.fn().mockReturnValue(true),
+      parseWebhookPayload: jest.fn(),
+    };
+
     const module = await Test.createTestingModule({
       providers: [
         AgreementsService,
@@ -64,6 +81,7 @@ describe('AgreementsService', () => {
         { provide: BlockchainRecordsService, useValue: blockchainRecords },
         { provide: ReceivingDestinationsService, useValue: receivingDestinations },
         { provide: NotificationsService, useValue: notifications },
+        { provide: PAYMENT_PROVIDER_TOKEN, useValue: mockPaymentProvider },
       ],
     }).compile();
 

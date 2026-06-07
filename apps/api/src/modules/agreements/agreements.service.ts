@@ -1,5 +1,6 @@
 import {
   Injectable,
+  Inject,
   NotFoundException,
   ForbiddenException,
   BadRequestException,
@@ -40,6 +41,10 @@ import { CreateSimpleAgreementDto } from './dto/create-simple-agreement.dto';
 import { CreateGuaranteedAgreementDto } from './dto/create-guaranteed-agreement.dto';
 import { ListAgreementsDto, MyAgreementRole } from './dto/list-agreements.dto';
 import { OpenDisputeDto } from './dto/open-dispute.dto';
+import {
+  PAYMENT_PROVIDER_TOKEN,
+  IPaymentProvider,
+} from '../payments/providers/payment-provider.interface';
 
 // ── Participant select used in find queries ──────────────────────
 const PARTICIPANT_SELECT = {
@@ -90,6 +95,8 @@ export class AgreementsService {
     private readonly blockchainRecords: BlockchainRecordsService,
     private readonly receivingDestinations: ReceivingDestinationsService,
     private readonly notifications: NotificationsService,
+    @Inject(PAYMENT_PROVIDER_TOKEN)
+    private readonly paymentProvider: IPaymentProvider,
   ) {}
 
   // ── Private helpers ────────────────────────────────────────────
@@ -586,14 +593,13 @@ export class AgreementsService {
     const now = new Date();
     const expiresAt = new Date(now.getTime() + 30 * 60 * 1000); // 30 min
 
-    // Simulated platform Pix key (real integration: BaaS/Fitbank key)
-    const platformPixKey = 'SELO-PLATFORM@DEV.LOCAL';
-    const simulatedTxid = randomUUID().replace(/-/g, '').slice(0, 35);
-    const simulatedQrCode = [
-      '00020126360014br.gov.bcb.pix0114SELO-PLATFORM',
-      `@DEV52040000530398654${String(guarantee.amount).padStart(10, '0')}`,
-      '5802BR5913SELO PLATFORM6009SAO PAULO63044A1B',
-    ].join('');
+    const pixChargeData = this.paymentProvider.createPixCharge({
+      paymentIntentId: idempotencyKey,
+      agreementId,
+      amount: guarantee.amount,
+      currency: guarantee.currency,
+      expiresAt,
+    });
 
     const result = await this.prisma.$transaction(async (tx) => {
       const paymentIntent = await tx.paymentIntent.create({
@@ -606,22 +612,25 @@ export class AgreementsService {
           status: PaymentIntentStatus.AWAITING_PAYMENT,
           idempotencyKey,
           expiresAt,
-          metadata: { provider: 'SIMULATED', environment: 'dev' } as Prisma.InputJsonValue,
+          metadata: {
+            provider: pixChargeData.providerName,
+            instructions: pixChargeData.instructions,
+          } as Prisma.InputJsonValue,
         },
       });
 
       await tx.pixCharge.create({
         data: {
           paymentIntentId: paymentIntent.id,
-          txid: simulatedTxid,
-          pixKey: platformPixKey,
-          pixKeyType: ReceivingKeyType.RANDOM,
-          qrCode: simulatedQrCode,
+          txid: pixChargeData.txid,
+          pixKey: pixChargeData.pixKey,
+          pixKeyType: pixChargeData.pixKeyType,
+          qrCode: pixChargeData.qrCode,
           amount: guarantee.amount,
           status: PixChargeStatus.ACTIVE,
           expiresAt,
-          rawRequest: { simulated: true, agreementId } as Prisma.InputJsonValue,
-          rawResponse: { txid: simulatedTxid, status: 'ACTIVE' } as Prisma.InputJsonValue,
+          rawRequest: pixChargeData.rawRequest as Prisma.InputJsonValue,
+          rawResponse: pixChargeData.rawResponse as Prisma.InputJsonValue,
         },
       });
 
@@ -650,7 +659,7 @@ export class AgreementsService {
       newData: { agreementId, amount: guarantee.amount.toString() },
     });
 
-    return this.prisma.paymentIntent.findUnique({
+    const paymentIntentFull = await this.prisma.paymentIntent.findUniqueOrThrow({
       where: { id: result.id },
       include: {
         pixCharge: {
@@ -666,6 +675,8 @@ export class AgreementsService {
         },
       },
     });
+
+    return { ...paymentIntentFull, instructions: pixChargeData.instructions };
   }
 
   async release(userId: string, agreementId: string) {

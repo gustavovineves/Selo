@@ -112,16 +112,88 @@ Uma garantia pode ter múltiplos `PaymentIntent` (retry flow): se um QR Code exp
 
 ---
 
+## Providers de Pagamento (Fase 24)
+
+O Selo usa uma interface `IPaymentProvider` que abstrai o provedor financeiro. O provider ativo é selecionado via env var `PAYMENT_PROVIDER`.
+
+### Providers disponíveis
+
+| PAYMENT_PROVIDER | Provider | Chamada real | Quando usar |
+|---|---|---|---|
+| `simulated` (padrão) | `SimulatedPaymentProvider` | Nunca | Desenvolvimento local, CI, unit tests |
+| `fitbank_sandbox` | `FitbankSandboxPaymentProvider` | Nunca (enquanto `FITBANK_ENABLE_REAL_CALLS=false`) | Integração sandbox Fitbank futura |
+
+### Como o provider é selecionado
+
+```
+PAYMENT_PROVIDER=simulated        → SimulatedPaymentProvider
+PAYMENT_PROVIDER=fitbank_sandbox  → FitbankSandboxPaymentProvider
+                                    (apenas se FITBANK_ENABLE_REAL_CALLS=false)
+```
+
+Se `FITBANK_ENABLE_REAL_CALLS=true`, o `FitbankSandboxPaymentProvider` continuará sem fazer chamadas reais na Fase 24 — essa flag está preparada para quando a integração real for implementada.
+
+### Diferença de QR Code por provider
+
+| Campo | simulated | fitbank_sandbox |
+|---|---|---|
+| `PixCharge.pixKey` | `SELO-PLATFORM@DEV.LOCAL` | `FITBANK_PIX_KEY` env (ou `sandbox@fitbank.com.br`) |
+| `PixCharge.txid` | `randomUUID()` 35 chars | `SBXSELO` + UUID truncado (formato sandbox Fitbank) |
+| `PixCharge.qrCode` | EMV fake simples | EMV fake mimicking Fitbank sandbox |
+| `PaymentIntent.metadata.provider` | `SIMULATED` | `FITBANK_SANDBOX` |
+| `instructions` retornado | "Use o botão de simulação" | "Use webhook ou simulate-confirmation" |
+
+### Endpoint de Webhook Sandbox
+
+`POST /api/v1/payments/webhooks/fitbank`
+
+Recebe confirmações de pagamento do Fitbank sandbox (ou de um simulador de webhook local).
+
+**Sem autenticação JWT** — autenticado por assinatura HMAC-SHA256 (opcional em sandbox).
+
+**Payload esperado:**
+```json
+{
+  "event": "PIX_PAYMENT_CONFIRMED",
+  "txid": "SBXSELOABCDEF12345678901234567",
+  "amount": "350.00",
+  "endToEndId": "E12345678202606061000xxxxxxxx",
+  "paymentDate": "2026-06-06T10:00:00Z"
+}
+```
+
+**Eventos mapeados:**
+
+| event (webhook) | Ação interna |
+|---|---|
+| `PIX_PAYMENT_CONFIRMED`, `PIX_RECEIVED`, `PAYMENT_CONFIRMED` | PaymentIntent → PAID, FinancialGuarantee → LOCKED, financialStatus → FUNDS_HELD |
+| `PIX_PAYMENT_FAILED`, `PAYMENT_FAILED` | Registrado, sem ação automática |
+| `PIX_EXPIRED`, `PAYMENT_EXPIRED` | Registrado, sem ação automática |
+| Qualquer outro | Ignorado com `received: true` |
+
+**Idempotência:** webhook duplicado com mesmo `txid` não reprocessa (verifica `PaymentIntent.status === PAID`).
+
+**Validação de assinatura:** se `FITBANK_WEBHOOK_SECRET` estiver configurado, valida `X-Fitbank-Signature: sha256=<hmac>`. Em sandbox sem secret, aceita todos.
+
+**Como testar o webhook sandbox localmente:**
+```bash
+curl -X POST http://localhost:3000/api/v1/payments/webhooks/fitbank \
+  -H "Content-Type: application/json" \
+  -d '{"event":"PIX_PAYMENT_CONFIRMED","txid":"SEU_TXID_AQUI","amount":"350.00"}'
+```
+
+---
+
 ## Ambiente Dev vs. Produção
 
-| Campo | Dev (local) | Produção (Fitbank) |
-|---|---|---|
-| `PixCharge.pixKey` | `SELO-PLATFORM@DEV.LOCAL` | Chave Pix da conta Fitbank |
-| `PixCharge.txid` | UUID gerado localmente | txid do PSP |
-| `PixCharge.qrCode` | String EMV simulada | QR Code real do PSP |
-| Confirmação | `POST /payments/:id/simulate-confirmation` | Webhook `POST /webhooks/pix/confirmation` |
-| Payout | `status=COMPLETED` imediato | Transação real Fitbank → recebedor |
-| Refund | `status=COMPLETED` imediato | Transação real Fitbank → pagador |
+| Campo | simulated (dev/CI) | fitbank_sandbox (fase atual) | Produção (futuro) |
+|---|---|---|---|
+| `PixCharge.pixKey` | `SELO-PLATFORM@DEV.LOCAL` | `sandbox@fitbank.com.br` | Chave Pix real da conta Fitbank |
+| `PixCharge.txid` | UUID local | `SBXSELO...` (fake sandbox) | txid real do PSP |
+| `PixCharge.qrCode` | EMV fake simples | EMV fake sandbox | QR Code real do PSP |
+| Confirmação | `POST /payments/:id/simulate-confirmation` | `POST /payments/webhooks/fitbank` (sandbox) | Webhook real Fitbank |
+| Payout | `status=COMPLETED` imediato (simulado) | `status=COMPLETED` imediato (simulado) | Transação real Fitbank → recebedor |
+| Refund | `status=COMPLETED` imediato (simulado) | `status=COMPLETED` imediato (simulado) | Transação real Fitbank → pagador |
 
 ---
 

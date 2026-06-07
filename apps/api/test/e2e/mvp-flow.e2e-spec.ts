@@ -826,4 +826,103 @@ describe('Fase 18 — MVP Flow E2E com PostgreSQL Real', () => {
       ).rejects.toThrow('Credenciais inválidas.');
     });
   });
+
+  // ─────────────────────────────────────────────────────────────────
+  // 12. Webhook Fitbank Sandbox — Fase 24
+  // ─────────────────────────────────────────────────────────────────
+
+  describe('Fase 24 — Webhook Fitbank Sandbox', () => {
+    let webhookAgrId: string;
+    let webhookTxid: string;
+    let webhookPiId: string;
+
+    it('cria acordo com garantia para teste de webhook', async () => {
+      const dto: CreateGuaranteedAgreementDto = {
+        title: 'Acordo webhook sandbox',
+        counterpartyKey: '@' + keyBNormalized,
+        amount: 75.0,
+        currency: 'BRL',
+        dueDate: DUE_DATE_ISO,
+      };
+
+      const agr = await agreements.createGuaranteed(userAId, dto);
+      webhookAgrId = agr.id;
+      expect(agr.operationalStatus).toBe('AWAITING_ACCEPTANCE');
+      expect(agr.financialStatus).toBe('AWAITING_PAYMENT');
+    });
+
+    it('bob aceita o acordo', async () => {
+      const agr = await agreements.accept(userBId, webhookAgrId);
+      expect(agr.operationalStatus).toBe('ACTIVE');
+    });
+
+    it('alice cria payment intent — provider sandbox retorna txid', async () => {
+      const result = await agreements.initiatePayment(userAId, webhookAgrId) as any;
+      webhookPiId = result.id;
+      webhookTxid = result.pixCharge?.txid;
+
+      expect(webhookTxid).toBeTruthy();
+      expect(result.status).toBe('AWAITING_PAYMENT');
+      expect(result.pixCharge?.qrCode).toBeTruthy();
+      expect(result.instructions).toBeTruthy();
+      expect(result.pixCharge?.amount.toString()).toMatch(/75/);
+    });
+
+    it('webhook PIX_CONFIRMED protege o valor (FUNDS_HELD)', async () => {
+      const webhookBody = {
+        event: 'PIX_PAYMENT_CONFIRMED',
+        txid: webhookTxid,
+        amount: '75.00',
+        endToEndId: `E9999${Date.now()}`,
+      };
+
+      const result = await payments.handleFitbankWebhook({}, JSON.stringify(webhookBody), webhookBody as any);
+
+      expect(result.received).toBe(true);
+      expect(result.message).toContain('protegido');
+    });
+
+    it('verifica que acordo está com financialStatus = FUNDS_HELD após webhook', async () => {
+      const agr = await agreements.findOne(userAId, webhookAgrId);
+      expect(agr.financialStatus).toBe('FUNDS_HELD');
+    });
+
+    it('webhook duplicado com mesmo txid é idempotente (não quebra)', async () => {
+      const webhookBody = {
+        event: 'PIX_PAYMENT_CONFIRMED',
+        txid: webhookTxid,
+        amount: '75.00',
+      };
+
+      const result = await payments.handleFitbankWebhook({}, JSON.stringify(webhookBody), webhookBody as any);
+      expect(result.received).toBe(true);
+    });
+
+    it('webhook com txid inexistente é ignorado sem erro', async () => {
+      const webhookBody = {
+        event: 'PIX_PAYMENT_CONFIRMED',
+        txid: 'txid-que-nao-existe-em-lugar-nenhum',
+        amount: '1.00',
+      };
+
+      const result = await payments.handleFitbankWebhook({}, JSON.stringify(webhookBody), webhookBody as any);
+      expect(result.received).toBe(true);
+    });
+
+    it('webhook de evento desconhecido é registrado sem ação financeira', async () => {
+      const webhookBody = {
+        event: 'PIX_SOME_UNKNOWN_EVENT',
+        txid: 'txid-qualquer',
+      };
+
+      const result = await payments.handleFitbankWebhook({}, JSON.stringify(webhookBody), webhookBody as any);
+      expect(result.received).toBe(true);
+    });
+
+    it('confirma que nenhum dinheiro real foi movimentado', () => {
+      // Verificação documental: o provider é SIMULATED ou FITBANK_SANDBOX,
+      // FITBANK_ENABLE_REAL_CALLS=false (padrão), nenhuma chamada HTTP real ocorreu.
+      expect(process.env['FITBANK_ENABLE_REAL_CALLS']).not.toBe('true');
+    });
+  });
 });

@@ -503,15 +503,22 @@ Adiciona mensagem à disputa.
 
 ## Ambiente de Desenvolvimento
 
-Em ambiente local, a integração com Fitbank/BaaS não existe. Os seguintes comportamentos são simulados:
+O provider de pagamento é selecionado via env `PAYMENT_PROVIDER` (Fase 24):
 
-| Comportamento real (produção) | Simulação (dev/local) |
+| `PAYMENT_PROVIDER` | Confirmação | Chave Pix |
+|---|---|---|
+| `simulated` (padrão) | `POST /payments/:id/simulate-confirmation` | `SELO-PLATFORM@DEV.LOCAL` |
+| `fitbank_sandbox` | `POST /payments/webhooks/fitbank` + simulate-confirmation | Configurada via `FITBANK_PIX_KEY` |
+
+Em todos os casos, nenhuma chamada real ao Fitbank é feita enquanto `FITBANK_ENABLE_REAL_CALLS=false`.
+
+| Comportamento real (produção futura) | Dev / Sandbox (atual) |
 |---|---|
-| Webhook de confirmação Pix (Fitbank) | `POST /payments/:id/simulate-confirmation` |
-| Chave Pix da conta de custódia | `SELO-PLATFORM@DEV.LOCAL` |
-| Liberação real via Pix/TEF | Payout `status=COMPLETED` imediatamente |
-| Reembolso real via Pix | Refund `status=COMPLETED` imediatamente |
-| Submissão à blockchain | `BlockchainRecord status=PENDING` (Fase 6) |
+| Webhook de confirmação Pix (Fitbank) | `POST /payments/webhooks/fitbank` (sandbox) ou `simulate-confirmation` |
+| Chave Pix da conta de custódia | Simulada ou `FITBANK_PIX_KEY` sandbox |
+| Liberação real via Pix/TEF | Payout `status=COMPLETED` imediatamente (simulado) |
+| Reembolso real via Pix | Refund `status=COMPLETED` imediatamente (simulado) |
+| Submissão à blockchain | `BlockchainRecord status=PENDING` (Fase 26) |
 
 ---
 
