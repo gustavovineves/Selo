@@ -396,13 +396,98 @@ Time:        ~6s
 
 ---
 
+## CI — GitHub Actions (Fase 22)
+
+O projeto conta com um workflow de CI em `.github/workflows/ci.yml` que roda automaticamente em push e pull request nas branches `main` e `dev`.
+
+### Quando roda
+
+| Evento | Branches | Jobs disparados |
+|---|---|---|
+| `push` | `main`, `dev` | `api` + `typecheck` (paralelos) |
+| `pull_request` | `main`, `dev` | `api` + `typecheck` (paralelos) |
+
+Execuções concorrentes para a mesma branch são canceladas automaticamente (`cancel-in-progress: true`).
+
+### Jobs
+
+| Job | Runner | Postgres | Comandos |
+|---|---|---|---|
+| `api` | ubuntu-latest | ✅ Serviço PostgreSQL 16 | install → generate → deploy → test → test:e2e → build |
+| `typecheck` | ubuntu-latest | ✗ Não precisa | install → typecheck mobile → typecheck admin |
+
+Os dois jobs correm **em paralelo**, economizando tempo total de CI.
+
+### Como o PostgreSQL de teste é configurado no CI
+
+O job `api` declara um **service container** PostgreSQL 16-alpine:
+
+```yaml
+services:
+  postgres:
+    image: postgres:16-alpine
+    env:
+      POSTGRES_USER: selo
+      POSTGRES_PASSWORD: selopassword
+      POSTGRES_DB: selodb
+    ports:
+      - 5432:5432
+    options: >-
+      --health-cmd "pg_isready -U selo -d selodb"
+      --health-interval 10s
+      --health-timeout 5s
+      --health-retries 5
+```
+
+GitHub Actions aguarda o health check passar antes de iniciar os steps. A `DATABASE_URL` aponta para `localhost:5432` (porta padrão do container de serviço):
+
+```
+DATABASE_URL: postgresql://selo:selopassword@localhost:5432/selodb?schema=public
+```
+
+### Sequência de steps do job `api`
+
+```
+pnpm install --frozen-lockfile
+pnpm --filter @selo/api prisma:generate   ← gera o Prisma Client
+pnpm --filter @selo/api prisma:deploy     ← aplica migration init_complete_schema ao banco CI
+pnpm --filter @selo/api test              ← 155 testes unitários (sem banco, mocks de Prisma)
+pnpm --filter @selo/api test:e2e          ← 83 testes E2E com PostgreSQL real
+pnpm --filter @selo/api build             ← build NestJS (valida compilação TypeScript)
+```
+
+### Segredos no CI
+
+Nenhum segredo real é usado. Todas as variáveis de ambiente são valores fake exclusivos para CI, declarados diretamente no workflow:
+
+| Variável | Valor no CI | Observação |
+|---|---|---|
+| `DATABASE_URL` | `postgresql://selo:selopassword@localhost:5432/selodb?schema=public` | Banco CI isolado |
+| `JWT_SECRET` | `ci-jwt-secret-for-testing-only-not-for-production-00000000` | Fake, não é segredo real |
+| `JWT_REFRESH_SECRET` | `ci-refresh-secret-for-testing-only-not-for-production-0000` | Fake |
+| `ADMIN_JWT_SECRET` | `ci-admin-jwt-secret-for-testing-only-not-for-production-000` | Fake |
+| `ADMIN_TOKEN` | `ci-admin-token-for-testing-only` | Fake (legado) |
+
+Nenhum valor real de produção aparece no repositório. `.env` real nunca é commitado (apenas `.env.example`).
+
+### Limitações do CI
+
+| Limitação | Observação |
+|---|---|
+| Mobile não tem Jest configurado | Apenas typecheck roda no CI; testes de componente ficam para uma fase futura |
+| Admin não tem Jest configurado | Idem — apenas typecheck |
+| Sem threshold de cobertura | `coverageThreshold` não definido ainda |
+| Sem cache de Docker layer | O postgres service container é sempre baixado; image caching pode ser adicionado |
+| `test:e2e` depende de Docker localmente | Em CI usa service container; localmente requer `pnpm docker:up` |
+
+---
+
 ## Próximos Passos Recomendados
 
-1. **Testes E2E** — com banco PostgreSQL real via Docker, usando `@nestjs/testing` + seed de dados
-2. **Cobertura dos caminhos felizes de release/refund** — atualmente cobertos em manuais
-3. **Configurar Jest no Mobile** — `jest-expo` + mocks de `expo-secure-store`
-4. **CI automatizado** — rodar `pnpm --filter @selo/api test` em pull requests (GitHub Actions)
-5. **Threshold de cobertura** — definir `coverageThreshold` no jest config após estabilizar
+1. **Cobertura dos caminhos felizes de release/refund** — atualmente cobertos em manuais
+2. **Configurar Jest no Mobile** — `jest-expo` + mocks de `expo-secure-store`
+3. **Threshold de cobertura** — definir `coverageThreshold` no jest config após estabilizar
+4. **Cache de imagem Docker no CI** — evitar download repetido do `postgres:16-alpine`
 
 ---
 

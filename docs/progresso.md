@@ -1344,11 +1344,107 @@ Tela `/settings` com 3 seções expansíveis:
 
 ---
 
+## 5q. Fase 22 — CI/GitHub Actions (Implementada)
+
+### Objetivo
+
+Proteger a base do MVP com validação automática em cada push e pull request. O CI roda todos os testes e verificações que antes eram manuais.
+
+### Estado do repositório
+
+- Branch: `dev`
+- Git status: limpo antes desta fase
+- Nenhum segredo real adicionado ao repositório
+
+### Arquivo criado
+
+| Arquivo | Descrição |
+|---|---|
+| `.github/workflows/ci.yml` | Workflow GitHub Actions completo |
+
+### Documentos atualizados
+
+| Arquivo | Alteração |
+|---|---|
+| `docs/tests.md` | Seção "CI — GitHub Actions" adicionada: quando roda, jobs, PostgreSQL, secrets, limitações |
+| `docs/progresso.md` | Esta seção |
+| `README.md` | Fase 22 adicionada à tabela de fases concluídas |
+
+### Quando o CI roda
+
+| Evento | Branches |
+|---|---|
+| `push` | `main`, `dev` |
+| `pull_request` | `main`, `dev` |
+
+Execuções concorrentes na mesma branch são canceladas automaticamente.
+
+### Jobs e comandos executados
+
+| Job | Comandos |
+|---|---|
+| `api` | `pnpm install --frozen-lockfile` → `prisma:generate` → `prisma:deploy` → `test` (155) → `test:e2e` (83) → `build` |
+| `typecheck` | `pnpm install --frozen-lockfile` → `typecheck mobile` → `typecheck admin` |
+
+Os dois jobs rodam **em paralelo** (sem dependência entre si).
+
+### PostgreSQL no CI
+
+O job `api` usa um **service container** `postgres:16-alpine` com:
+- Usuário: `selo`, senha: `selopassword`, banco: `selodb`
+- Health check: `pg_isready -U selo -d selodb` (interval 10s, timeout 5s, retries 5)
+- `DATABASE_URL`: `postgresql://selo:selopassword@localhost:5432/selodb?schema=public`
+
+O workflow aguarda o health check antes de iniciar os steps. As migrações são aplicadas com `prisma migrate deploy` (aplica `init_complete_schema` no banco CI fresco).
+
+### Secrets no CI
+
+Nenhum segredo real. Todos os valores são fake e exclusivos para CI, declarados no próprio workflow:
+
+| Variável | Tipo |
+|---|---|
+| `DATABASE_URL` | Banco local do service container |
+| `JWT_SECRET` | String fake (`ci-jwt-secret-for-testing-only-…`) |
+| `JWT_REFRESH_SECRET` | String fake |
+| `ADMIN_JWT_SECRET` | String fake |
+| `ADMIN_TOKEN` | String fake (legado) |
+
+O arquivo `.env` real nunca é commitado — apenas `.env.example` está no repositório.
+
+### Resultados dos comandos locais
+
+| Comando | Resultado |
+|---|---|
+| `pnpm --filter @selo/api test` | ✅ **155 testes, 10 suítes, 0 falhas** |
+| `pnpm --filter @selo/api test:e2e` | ✅ **83 testes, 1 suíte, 0 falhas** |
+| `pnpm --filter @selo/api build` | ✅ Exit 0 |
+| `pnpm --filter @selo/mobile typecheck` | ✅ Exit 0 |
+| `pnpm --filter @selo/admin typecheck` | ✅ Exit 0 |
+
+### Confirmações obrigatórias
+
+| Restrição | Status |
+|---|---|
+| Schema Prisma alterado? | **Não** |
+| Migration rodada? | **Não** |
+| Fitbank real? | **Não** |
+| Pix real? | **Não** |
+| Webhook real? | **Não** |
+| Blockchain real? | **Não** |
+| KYC? | **Não** |
+| Chat? | **Não** |
+| Regra financeira alterada? | **Não** |
+| Testes removidos para passar? | **Não** |
+| dueDate continua obrigatório? | **Sim** |
+| Dinheiro real movimentado? | **Não** |
+| Commit feito? | **Não** |
+
+---
+
 ## 7. Próxima Fase
 
-Fases sugeridas após a Adequação Integral (Fase 21), em ordem de prioridade:
+Fases sugeridas após o CI (Fase 22), em ordem de prioridade:
 
-- **Fase 22** — CI/GitHub Actions: `pnpm --filter @selo/api test` em cada PR
 - **Fase 23** — Ambientes e Segurança: staging isolado, variáveis por ambiente, secrets management
 - **Fase 24** — Fitbank Sandbox / Pix Sandbox: substituição do `simulate-confirmation` por webhook real
 - **Fase 25** — KYC Progressivo: onboarding financeiro com CPF e validação do Banco Central

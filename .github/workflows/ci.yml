@@ -1,0 +1,107 @@
+name: CI
+
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+    branches: [main, dev]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ── Job 1: Backend — Testes unitários, E2E com PostgreSQL real, build ──────
+  api:
+    name: API — Testes + Build
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: selo
+          POSTGRES_PASSWORD: selopassword
+          POSTGRES_DB: selodb
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U selo -d selodb"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      # Valores fake exclusivos para CI — nunca usar em produção
+      DATABASE_URL: postgresql://selo:selopassword@localhost:5432/selodb?schema=public
+      JWT_SECRET: ci-jwt-secret-for-testing-only-not-for-production-00000000
+      JWT_REFRESH_SECRET: ci-refresh-secret-for-testing-only-not-for-production-0000
+      JWT_EXPIRES_IN: 15m
+      JWT_REFRESH_EXPIRES_IN: 7d
+      ADMIN_JWT_SECRET: ci-admin-jwt-secret-for-testing-only-not-for-production-000
+      ADMIN_JWT_EXPIRES_IN: 1d
+      ADMIN_TOKEN: ci-admin-token-for-testing-only
+      PORT: 3000
+      NODE_ENV: test
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 9
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate Prisma Client
+        run: pnpm --filter @selo/api prisma:generate
+
+      - name: Apply database migrations
+        run: pnpm --filter @selo/api prisma:deploy
+
+      - name: Unit tests (155 testes)
+        run: pnpm --filter @selo/api test
+
+      - name: E2E tests — PostgreSQL real (83 testes)
+        run: pnpm --filter @selo/api test:e2e
+
+      - name: Build da API
+        run: pnpm --filter @selo/api build
+
+  # ── Job 2: TypeScript — typecheck mobile e admin (sem banco) ──────────────
+  typecheck:
+    name: TypeScript — Mobile + Admin
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 9
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck Mobile
+        run: pnpm --filter @selo/mobile typecheck
+
+      - name: Typecheck Admin
+        run: pnpm --filter @selo/admin typecheck

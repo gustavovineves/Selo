@@ -104,12 +104,12 @@ pnpm dev:mobile
 | Fase 19 | ✅ Concluído | Polimento UX Mobile: Date Picker + Time Wheel para prazo |
 | Fase 20 | ✅ Concluído | Auditoria final do MVP simulado |
 | Fase 21 | ✅ Concluído | Adequação integral ao documento de visão: onboarding, busca, score, configurações, blockchain em mais eventos, admin completo |
+| Fase 22 | ✅ Concluído | CI/GitHub Actions: workflow automático em push/PR — testes unitários, E2E com PostgreSQL, build, typecheck mobile e admin |
 
 ## Próximas Etapas (não implementadas)
 
 | Fase | Descrição |
 |------|-----------|
-| Fase 22 | CI/GitHub Actions |
 | Fase 23 | Ambientes e Segurança |
 | Fase 24 | Fitbank Sandbox / Pix Sandbox |
 | Fase 25 | KYC Progressivo |
