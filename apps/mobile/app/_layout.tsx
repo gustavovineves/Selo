@@ -51,6 +51,14 @@ export default function RootLayout() {
         <Stack.Screen name="search" options={{ headerShown: false }} />
         <Stack.Screen name="trust-score" options={{ headerShown: false }} />
         <Stack.Screen name="settings" options={{ headerShown: false }} />
+        <Stack.Screen
+          name="financial-verification"
+          options={{
+            title: 'Verificação financeira',
+            headerStyle: { backgroundColor: '#1E1B4B' },
+            headerTintColor: '#ffffff',
+          }}
+        />
       </Stack>
     </SafeAreaProvider>
   );

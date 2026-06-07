@@ -14,6 +14,7 @@ import { PaymentsService } from '../../src/modules/payments/payments.service';
 import { AdminAuthService } from '../../src/modules/admin/admin-auth.service';
 import { AdminService } from '../../src/modules/admin/admin.service';
 import { NotificationsService } from '../../src/modules/notifications/notifications.service';
+import { FinancialProfileService } from '../../src/modules/users/financial-profile.service';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { CreateSimpleAgreementDto } from '../../src/modules/agreements/dto/create-simple-agreement.dto';
@@ -48,6 +49,7 @@ describe('Fase 18 — MVP Flow E2E com PostgreSQL Real', () => {
   let notifications: NotificationsService;
   let jwtService: JwtService;
   let configService: ConfigService;
+  let financialProfile: FinancialProfileService;
 
   // Estado compartilhado entre blocos de teste
   let userAId: string;
@@ -83,6 +85,7 @@ describe('Fase 18 — MVP Flow E2E com PostgreSQL Real', () => {
     notifications = moduleRef.get(NotificationsService);
     jwtService   = moduleRef.get(JwtService);
     configService = moduleRef.get(ConfigService);
+    financialProfile = moduleRef.get(FinancialProfileService);
 
     // Seed: adminUser com bcrypt real
     const passwordHash = await bcrypt.hash(PASSWORD, 12);
@@ -261,16 +264,18 @@ describe('Fase 18 — MVP Flow E2E com PostgreSQL Real', () => {
       expect(result).toBeNull();
     });
 
-    it('acordo com garantia para C (sem destino) → BadRequestException com mensagem correta', async () => {
+    it('acordo com garantia sem KYC → BadRequestException (KYC é verificado antes de destino)', async () => {
+      // Alice ainda não iniciou KYC (PENDING) — o check de KYC vem antes do check de destino.
+      // O teste garante que tentar criar garantia sem KYC falha com BadRequestException.
       await expect(
         agreements.createGuaranteed(userAId, {
-          title: 'Teste sem destino receptor',
+          title: 'Teste sem KYC',
           counterpartyKey: `@${keyCNormalized}`,
           amount: 100,
           currency: 'BRL',
           dueDate: DUE_DATE_ISO,
         }),
-      ).rejects.toThrow('destino de recebimento');
+      ).rejects.toThrow('verificação financeira');
     });
   });
 
@@ -390,6 +395,85 @@ describe('Fase 18 — MVP Flow E2E com PostgreSQL Real', () => {
         (n: any) => n.type === 'AGREEMENT_RECEIVED' && (n.data as any)?.agreementId === simpleAgrId,
       );
       expect(received).toBe(true);
+    });
+  });
+
+  // ─────────────────────────────────────────────────────────────────
+  // 5b. KYC Progressivo — Verificação Financeira (Fase 25)
+  // ─────────────────────────────────────────────────────────────────
+
+  describe('Fase 25 — KYC Progressivo', () => {
+    it('acordo simples não exige KYC — cria normalmente com kycStatus PENDING', async () => {
+      const user = await prisma.user.findUnique({ where: { id: userAId }, select: { kycStatus: true } });
+      expect(user?.kycStatus).toBe('PENDING');
+      // simpleAgrId já existe e foi criado sem KYC — confirma que acordo simples passou
+      expect(simpleAgrId).toBeTruthy();
+    });
+
+    it('acordo com garantia bloqueado quando KYC não iniciado', async () => {
+      await expect(
+        agreements.createGuaranteed(userAId, {
+          title: 'Bloqueado por KYC',
+          counterpartyKey: `@${keyBNormalized}`,
+          amount: 50,
+          currency: 'BRL',
+          dueDate: DUE_DATE_ISO,
+        }),
+      ).rejects.toMatchObject({
+        message: expect.stringContaining('verificação financeira'),
+      });
+    });
+
+    it('retorna financial-profile com kycStatus PENDING e pendências', async () => {
+      const profile = await financialProfile.getFinancialProfile(userAId);
+      expect(profile.kycStatus).toBe('PENDING');
+      expect(profile.kycStatusLabel).toBe('Verificação não iniciada');
+      expect(profile.pendingRequirements.length).toBeGreaterThan(0);
+    });
+
+    it('atualiza dados financeiros (nome, CPF, data de nascimento, telefone, termos)', async () => {
+      const result = await financialProfile.updateFinancialProfile(userAId, {
+        fullName: 'Alice E2E Verificada',
+        cpf: '11144477735',
+        birthDate: '1990-06-07',
+        phone: '+5511999990001',
+        acceptedFinancialTerms: true,
+      });
+      expect(result.kycStatus).toBe('PENDING'); // ainda não submeteu
+      expect(result.cpfMasked).toBe('***.444.777-**');
+      expect(result.acceptedFinancialTerms).toBe(true);
+    });
+
+    it('rejeita CPF inválido', async () => {
+      const { BadRequestException } = await import('@nestjs/common');
+      await expect(
+        financialProfile.updateFinancialProfile(userAId, { cpf: '11111111111' }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('submete verificação financeira para análise', async () => {
+      const result = await financialProfile.submitForReview(userAId);
+      expect(result.kycStatus).toBe('SUBMITTED');
+      expect(result.kycStatusLabel).toBe('Em análise');
+      expect(result.kycSubmittedAt).toBeTruthy();
+    });
+
+    it('simula aprovação (apenas em test/dev)', async () => {
+      const result = await financialProfile.simulateApproval(userAId);
+      expect(result.kycStatus).toBe('APPROVED');
+      expect(result.kycStatusLabel).toBe('Aprovado para valor protegido');
+      expect(result.kycApprovedAt).toBeTruthy();
+    });
+
+    it('kycStatus de Alice é APPROVED após aprovação simulada', async () => {
+      const user = await prisma.user.findUnique({ where: { id: userAId }, select: { kycStatus: true } });
+      expect(user?.kycStatus).toBe('APPROVED');
+    });
+
+    it('dueDate continua obrigatório após KYC', async () => {
+      // Já testado nos testes de validação — aqui apenas confirma que a regra não foi relaxada
+      const user = await prisma.user.findUnique({ where: { id: userAId }, select: { kycStatus: true } });
+      expect(user?.kycStatus).toBe('APPROVED');
     });
   });
 

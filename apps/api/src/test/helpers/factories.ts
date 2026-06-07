@@ -325,8 +325,8 @@ export function createPrismaMock() {
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const mock: Record<string, any> = {
-    user: { findUnique: fn(), findFirst: fn(), create: fn(), update: fn(), count: fn() },
-    userProfile: { findUnique: fn(), update: fn() },
+    user: { findUnique: fn(), findFirst: fn(), findMany: fn(), create: fn(), update: fn(), count: fn() },
+    userProfile: { findUnique: fn(), update: fn(), upsert: fn() },
     deviceSession: { findUnique: fn(), create: fn(), update: fn() },
     receivingKey: {
       findUnique: fn(), findFirst: fn(), findMany: fn(), create: fn(), update: fn(),
@@ -357,6 +357,7 @@ export function createPrismaMock() {
     notification: {
       create: fn(), findUnique: fn(), findMany: fn(), update: fn(), updateMany: fn(), count: fn(),
     },
+    financialProfile: { findUnique: fn(), findFirst: fn(), upsert: fn(), create: fn(), update: fn() },
     trustScore: { findUnique: fn(), update: fn() },
     trustScoreEvent: { create: fn() },
     auditLog: { create: fn() },

@@ -54,6 +54,9 @@ jobs:
       FITBANK_CLIENT_ID: ci-fitbank-client-fake
       FITBANK_CLIENT_SECRET: ci-fitbank-secret-fake
       FITBANK_WEBHOOK_SECRET: ci-fitbank-webhook-secret-fake
+      # KYC — usar simulado em CI; chamadas reais desabilitadas
+      KYC_PROVIDER: simulated
+      KYC_ENABLE_REAL_CALLS: 'false'
 
     steps:
       - name: Checkout
@@ -79,10 +82,10 @@ jobs:
       - name: Apply database migrations
         run: pnpm --filter @selo/api prisma:deploy
 
-      - name: Unit tests (155 testes)
+      - name: Unit tests (Fase 25 — ~200+ testes)
         run: pnpm --filter @selo/api test
 
-      - name: E2E tests — PostgreSQL real (83 testes)
+      - name: E2E tests — PostgreSQL real (Fase 25 — ~100+ testes)
         run: pnpm --filter @selo/api test:e2e
 
       - name: Build da API

@@ -55,6 +55,8 @@
 | `FITBANK_CLIENT_SECRET` | — | Client Secret Fitbank sandbox (Fase 24+) | ✅ fake |
 | `FITBANK_WEBHOOK_SECRET` | — | Secret para validação HMAC do webhook (Fase 24+) | ✅ fake |
 | `FITBANK_PIX_KEY` | — | Chave Pix Fitbank sandbox (Fase 24+) | ✅ fake |
+| `KYC_PROVIDER` | — | `simulated` (padrão) — sem chamada real (Fase 25+) | ✅ `simulated` |
+| `KYC_ENABLE_REAL_CALLS` | — | `false` — NUNCA mudar para `true` sem instrução explícita | ✅ `false` |
 
 ### 3.2 Admin Web (`apps/admin`)
 

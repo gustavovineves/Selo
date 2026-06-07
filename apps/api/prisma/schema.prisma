@@ -33,6 +33,13 @@ enum KycStatus {
   REJECTED
 }
 
+enum FinancialVerificationLevel {
+  NONE
+  BASIC
+  STANDARD
+  FULL
+}
+
 enum DocumentType {
   CPF
   CNPJ
@@ -316,6 +323,10 @@ enum NotificationType {
   DISPUTE_RESOLVED
   TRUST_SCORE_UPDATED
   SYSTEM_ALERT
+  KYC_SUBMITTED
+  KYC_APPROVED
+  KYC_REJECTED
+  FINANCIAL_VERIFICATION_REQUIRED
 }
 
 enum NotificationStatus {
@@ -350,6 +361,9 @@ enum AuditAction {
   ADMIN_ACTION
   ADMIN_DISPUTE_RESOLVED
   ADMIN_USER_SUSPENDED
+  KYC_SUBMITTED
+  KYC_APPROVED_ADMIN
+  KYC_REJECTED_ADMIN
 }
 
 enum AdminRole {
@@ -385,6 +399,7 @@ model User {
   deletedAt       DateTime?
 
   profile                 UserProfile?
+  financialProfile        FinancialProfile?
   sessions                DeviceSession[]
   receivingKeys           ReceivingKey[]
   receivingDestinations   ReceivingDestination[]
@@ -456,6 +471,31 @@ model DeviceSession {
   @@index([userId])
   @@index([userId, expiresAt]) // sessões ativas de um usuário
   @@map("device_sessions")
+}
+
+// =============================================================
+// MODEL: FinancialProfile
+// Dados de onboarding financeiro — coletados progressivamente
+// apenas quando o usuário deseja usar valor protegido.
+// CPF fica em User.document; dados de perfil em UserProfile.
+// Este model armazena metadados do processo de verificação.
+// =============================================================
+
+model FinancialProfile {
+  id                       String                     @id @default(cuid())
+  userId                   String                     @unique
+  acceptedFinancialTermsAt DateTime?
+  kycSubmittedAt           DateTime?
+  kycApprovedAt            DateTime?
+  kycRejectedAt            DateTime?
+  kycRejectionReason       String?
+  verificationLevel        FinancialVerificationLevel @default(NONE)
+  createdAt                DateTime                   @default(now())
+  updatedAt                DateTime                   @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("financial_profiles")
 }
 
 // =============================================================

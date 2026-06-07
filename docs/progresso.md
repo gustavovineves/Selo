@@ -1,6 +1,6 @@
 # Progresso do Projeto Selo
 
-Última atualização: 2026-06-06 (Fase 24 — Fitbank Sandbox / Pix Sandbox)
+Última atualização: 2026-06-07 (Fase 25 — KYC Progressivo)
 
 ---
 
@@ -1661,15 +1661,135 @@ POST /payments/webhooks/fitbank  (ou simulate-confirmation)
 
 ---
 
+## 5s. Fase 25 — KYC Progressivo (Implementada)
+
+### Objetivo
+
+Preparar o Selo para verificação financeira progressiva: cadastro continua leve (sem CPF), verificação só aparece quando o usuário quer usar valor protegido.
+
+### Branch e estado do repositório
+
+- Branch: `main`
+- Estado: limpo antes da fase
+- `.env` real: **não rastreado**
+- CPF no cadastro inicial? **Não**
+- KYC real integrado? **Não**
+- Consulta externa real? **Não**
+- Dinheiro real movimentado? **Não**
+
+### Schema alterado
+
+| Alteração | Detalhe |
+|---|---|
+| Novo enum `FinancialVerificationLevel` | `NONE | BASIC | STANDARD | FULL` |
+| Novos valores em `NotificationType` | `KYC_SUBMITTED, KYC_APPROVED, KYC_REJECTED, FINANCIAL_VERIFICATION_REQUIRED` |
+| Novos valores em `AuditAction` | `KYC_SUBMITTED, KYC_APPROVED_ADMIN, KYC_REJECTED_ADMIN` |
+| Novo model `FinancialProfile` | Metadados do processo KYC (datas, motivo de rejeição, nível) |
+| Relação `User.financialProfile` | FK para `FinancialProfile?` |
+
+### Migration criada
+
+`20260607031509_fase25_financial_profile_kyc` — aplicada com sucesso.
+
+### Arquivos criados
+
+| Arquivo | Descrição |
+|---|---|
+| `apps/api/src/common/utils/cpf.util.ts` | `validateCpf`, `normalizeCpf`, `maskCpf` |
+| `apps/api/src/common/utils/cpf.util.spec.ts` | 8 testes unitários do util CPF |
+| `apps/api/src/modules/users/dto/update-financial-profile.dto.ts` | DTO com fullName, cpf, birthDate, phone, acceptedFinancialTerms |
+| `apps/api/src/modules/users/dto/simulate-kyc.dto.ts` | DTO para simulação de rejeição |
+| `apps/api/src/modules/users/financial-profile.service.ts` | Serviço com lógica KYC progressivo |
+| `apps/api/src/modules/users/financial-profile.service.spec.ts` | 13 testes unitários |
+| `apps/mobile/app/financial-verification.tsx` | Tela mobile de verificação financeira |
+| `docs/financial-verification.md` | Documentação completa da Fase 25 |
+
+### Arquivos atualizados
+
+| Arquivo | Alteração |
+|---|---|
+| `apps/api/prisma/schema.prisma` | Novos enums + FinancialProfile model |
+| `apps/api/src/modules/users/users.controller.ts` | +5 endpoints KYC |
+| `apps/api/src/modules/users/users.module.ts` | Importa deps KYC |
+| `apps/api/src/modules/agreements/agreements.service.ts` | Check KYC em `createGuaranteed` |
+| `apps/api/src/modules/admin/admin.service.ts` | `getUser` inclui `financialProfile` e CPF mascarado |
+| `apps/api/src/test/helpers/factories.ts` | `financialProfile`, `userProfile.upsert`, `user.findMany` no mock |
+| `apps/api/src/modules/agreements/agreements.service.spec.ts` | +1 teste KYC, atualiza mocks |
+| `apps/api/test/e2e/mvp-flow.e2e-spec.ts` | Bloco Fase 25 (+8 testes E2E) + atualiza teste de destino |
+| `apps/mobile/src/types/api.ts` | `KycStatus`, `FinancialProfileResponse`, `UpdateFinancialProfilePayload` |
+| `apps/mobile/src/services/users.service.ts` | +4 métodos de financial profile |
+| `apps/mobile/app/_layout.tsx` | Rota `financial-verification` |
+| `apps/mobile/app/(app)/profile.tsx` | Link "Verificação financeira" no menu |
+| `apps/mobile/app/create-agreement.tsx` | Redireciona para verificação quando KYC bloqueado |
+| `.env.example` | Vars KYC |
+| `apps/api/.env.example` | Vars KYC |
+| `.github/workflows/ci.yml` | `KYC_PROVIDER=simulated`, `KYC_ENABLE_REAL_CALLS=false` |
+| `docs/guaranteed-agreements.md` | Regra KYC na criação de garantia |
+| `docs/environments.md` | Vars KYC na tabela |
+| `README.md` | Fase 25 na tabela de concluídas; `financial-verification.md` na lista de docs |
+
+### Endpoints criados
+
+| Método | Rota | Descrição |
+|---|---|---|
+| GET | `/api/v1/users/me/financial-profile` | Retorna estado da verificação |
+| PATCH | `/api/v1/users/me/financial-profile` | Atualiza dados (parcial, antes de submeter) |
+| POST | `/api/v1/users/me/financial-profile/submit` | Envia para análise (→ SUBMITTED) |
+| POST | `/api/v1/users/me/financial-profile/simulate-approval` | Aprova (somente dev/test) |
+| POST | `/api/v1/users/me/financial-profile/simulate-rejection` | Rejeita com motivo (somente dev/test) |
+
+### Regra KYC progressivo implementada
+
+| Regra | Status |
+|---|---|
+| Cadastro inicial sem CPF | ✅ RegisterDto não tem campo CPF |
+| Acordo simples sem KYC | ✅ Não bloqueado |
+| Acordo com garantia exige KYC | ✅ `SUBMITTED`, `UNDER_REVIEW` ou `APPROVED` |
+| CPF mascarado em respostas | ✅ `***.456.789-**` |
+| CPF não logado | ✅ |
+| Simulação bloqueada em production | ✅ HTTP 403 |
+| KYC real não integrado | ✅ |
+
+### Resultados dos comandos
+
+| Comando | Resultado |
+|---|---|
+| `pnpm --filter @selo/api test` | ✅ **206 testes, 13 suítes, 0 falhas** |
+| `pnpm --filter @selo/api test:e2e` | ✅ **101 testes, 1 suíte, 0 falhas** |
+| `pnpm --filter @selo/api build` | ✅ Exit 0 |
+| `pnpm --filter @selo/mobile typecheck` | ✅ Exit 0 |
+| `pnpm --filter @selo/admin typecheck` | ✅ Exit 0 |
+
+### Confirmações obrigatórias
+
+| Restrição | Status |
+|---|---|
+| CPF pedido no cadastro inicial? | **Não** |
+| KYC real integrado? | **Não** |
+| Consulta ao Banco Central? | **Não** |
+| Consulta ao Serpro? | **Não** |
+| Consulta a bureau? | **Não** |
+| Chamada externa real? | **Não** |
+| Imagem de documento? | **Não** |
+| CPF exposto sem máscara? | **Não** |
+| CPF logado? | **Não** |
+| Dinheiro real movimentado? | **Não** |
+| Fitbank real? | **Não** |
+| Blockchain real? | **Não** |
+| dueDate continua obrigatório? | **Sim** |
+| Acordo com garantia exige destino ativo? | **Sim** |
+| Commit feito? | **Não** |
+
+---
+
 ## 7. Próxima Fase
 
-Fases sugeridas após Fitbank Sandbox (Fase 24), em ordem de prioridade:
+Fases sugeridas após KYC Progressivo (Fase 25), em ordem de prioridade:
 
-- **Fase 25** — KYC Progressivo: onboarding financeiro com CPF e validação do Banco Central
 - **Fase 26** — Blockchain Testnet: registro de hash de acordos em Ethereum/Polygon testnet
 - **Fase 27** — UX Final e Beta Fechado: animações, upload de avatar, polish geral
 
-Não implementar sem instrução explícita: Fitbank real, blockchain real, KYC, push notifications reais.
+Não implementar sem instrução explícita: Fitbank real, blockchain real, KYC real, push notifications reais.
 
 ---
 

@@ -388,6 +388,19 @@ export class AgreementsService {
       avatarUrl: counterpartyProfile?.avatarUrl ?? null,
     };
 
+    // KYC progressivo: criador/pagador deve ter iniciado verificação financeira.
+    // Bloqueia se kycStatus === PENDING (nunca iniciou onboarding financeiro).
+    const payerKyc = await this.prisma.user.findUnique({
+      where: { id: creatorId },
+      select: { kycStatus: true },
+    });
+    if (!payerKyc || payerKyc.kycStatus === 'PENDING') {
+      throw new BadRequestException(
+        'Para criar um acordo com valor protegido, complete a verificação financeira primeiro. ' +
+          'Acesse Perfil → Verificação financeira para iniciar.',
+      );
+    }
+
     // Require the receiver to have an active receiving destination configured.
     // Snapshot is frozen at creation time — changing the destination later has no effect.
     const receiverDestination = await this.receivingDestinations.findAnyActive(counterpartyId);

@@ -853,6 +853,15 @@ export default function ProfileScreen() {
           <Ionicons name="chevron-forward" size={16} color={Colors.textMuted} />
         </TouchableOpacity>
 
+        <TouchableOpacity
+          style={styles.menuItem}
+          onPress={() => router.push('/financial-verification' as any)}
+        >
+          <Ionicons name="shield-checkmark-outline" size={20} color={Colors.textSecondary} />
+          <Text style={styles.menuText}>Verificação financeira</Text>
+          <Ionicons name="chevron-forward" size={16} color={Colors.textMuted} />
+        </TouchableOpacity>
+
         <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/settings' as any)}>
           <Ionicons name="settings-outline" size={20} color={Colors.textSecondary} />
           <Text style={styles.menuText}>Configurações</Text>

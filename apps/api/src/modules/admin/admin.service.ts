@@ -3,6 +3,7 @@ import {
   NotFoundException,
   BadRequestException,
 } from '@nestjs/common';
+import { maskCpf } from '../../common/utils/cpf.util';
 import {
   AgreementType,
   AgreementOperationalStatus,
@@ -771,11 +772,26 @@ export class AdminService {
       select: {
         id: true,
         email: true,
+        document: true,
+        documentType: true,
+        phone: true,
         status: true,
         kycStatus: true,
         createdAt: true,
         updatedAt: true,
         profile: true,
+        financialProfile: {
+          select: {
+            verificationLevel: true,
+            acceptedFinancialTermsAt: true,
+            kycSubmittedAt: true,
+            kycApprovedAt: true,
+            kycRejectedAt: true,
+            kycRejectionReason: true,
+            createdAt: true,
+            updatedAt: true,
+          },
+        },
         trustScore: {
           select: { score: true, level: true, totalAgreements: true, completedAgreements: true, disputesOpened: true, disputesWon: true, disputesLost: true },
         },
@@ -790,7 +806,13 @@ export class AdminService {
     });
 
     if (!user) throw new NotFoundException('Usuário não encontrado.');
-    return user;
+
+    // Mask CPF in admin response — admin sees masked value only
+    return {
+      ...user,
+      cpfMasked: user.document ? maskCpf(user.document) : null,
+      document: undefined,
+    };
   }
 
   // ── Acordos ──────────────────────────────────────────────────

@@ -1,3 +1,31 @@
+export type KycStatus = 'PENDING' | 'SUBMITTED' | 'UNDER_REVIEW' | 'APPROVED' | 'REJECTED';
+
+export interface FinancialProfileResponse {
+  kycStatus: KycStatus;
+  kycStatusLabel: string;
+  financialVerificationLevel: 'NONE' | 'BASIC' | 'STANDARD' | 'FULL';
+  cpfMasked: string | null;
+  fullName: string | null;
+  birthDate: string | null;
+  phone: string | null;
+  acceptedFinancialTerms: boolean;
+  acceptedFinancialTermsAt: string | null;
+  kycSubmittedAt: string | null;
+  kycApprovedAt: string | null;
+  kycRejectedAt: string | null;
+  kycRejectionReason: string | null;
+  pendingRequirements: string[];
+  humanMessage: string;
+}
+
+export interface UpdateFinancialProfilePayload {
+  fullName?: string;
+  cpf?: string;
+  birthDate?: string;
+  phone?: string;
+  acceptedFinancialTerms?: boolean;
+}
+
 export interface AuthMeResponse {
   id: string;
   email: string;

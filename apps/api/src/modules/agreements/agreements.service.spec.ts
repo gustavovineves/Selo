@@ -144,9 +144,18 @@ describe('AgreementsService', () => {
       dueDate: '2027-12-31T23:59:59.000Z',
     };
 
+    it('lança BadRequestException quando KYC não foi iniciado (PENDING)', async () => {
+      prisma.receivingKey.findUnique.mockResolvedValue(makeReceivingKeyB());
+      prisma.userProfile.findUnique.mockResolvedValue({ fullName: 'Alice Test', displayName: 'Alice' });
+      prisma.user.findUnique.mockResolvedValue({ kycStatus: 'PENDING' });
+
+      await expect(service.createGuaranteed(CREATOR_ID, dto)).rejects.toThrow(BadRequestException);
+    });
+
     it('lança BadRequestException quando recebedor não tem destino ativo', async () => {
       prisma.receivingKey.findUnique.mockResolvedValue(makeReceivingKeyB());
       prisma.userProfile.findUnique.mockResolvedValue({ fullName: 'Alice Test', displayName: 'Alice' });
+      prisma.user.findUnique.mockResolvedValue({ kycStatus: 'SUBMITTED' });
       receivingDestinations.findAnyActive.mockResolvedValue(null);
 
       await expect(service.createGuaranteed(CREATOR_ID, dto)).rejects.toThrow(BadRequestException);
@@ -159,13 +168,14 @@ describe('AgreementsService', () => {
       await expect(service.createGuaranteed(CREATOR_ID, dto)).rejects.toThrow(BadRequestException);
     });
 
-    it('cria acordo com garantia quando recebedor tem destino ativo', async () => {
+    it('cria acordo com garantia quando recebedor tem destino ativo e KYC iniciado', async () => {
       const keyB = makeReceivingKeyB();
       const agr = makeGuaranteedAgreement();
       const dest = makeReceivingDestination();
 
       prisma.receivingKey.findUnique.mockResolvedValue(keyB);
       prisma.userProfile.findUnique.mockResolvedValue({ fullName: 'Alice Test', displayName: 'Alice' });
+      prisma.user.findUnique.mockResolvedValue({ kycStatus: 'SUBMITTED' });
       receivingDestinations.findAnyActive.mockResolvedValue(dest);
       prisma.agreement.create.mockResolvedValue(agr);
       prisma.agreementParticipant.createMany.mockResolvedValue({ count: 2 });

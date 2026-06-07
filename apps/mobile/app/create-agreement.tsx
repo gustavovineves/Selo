@@ -303,8 +303,18 @@ export default function CreateAgreementScreen() {
       setCreatedAgreement(agreement);
       setSubmitted(true);
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : 'Erro ao criar o acordo.';
-      if (msg.includes('destino de recebimento')) {
+      const raw = (e as any)?.response?.data?.message ?? (e instanceof Error ? e.message : 'Erro ao criar o acordo.');
+      const msg: string = Array.isArray(raw) ? raw[0] : raw;
+      if (msg.includes('verificação financeira') || msg.includes('KYC')) {
+        Alert.alert(
+          'Verificação necessária',
+          'Para criar um acordo com valor protegido, complete sua verificação financeira.',
+          [
+            { text: 'Agora não', style: 'cancel' },
+            { text: 'Verificar', onPress: () => router.push('/financial-verification' as any) },
+          ],
+        );
+      } else if (msg.includes('destino de recebimento')) {
         setStepError(
           'O recebedor precisa configurar um destino de recebimento no app antes de receber valores protegidos.',
         );

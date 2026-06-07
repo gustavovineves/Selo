@@ -14,6 +14,7 @@ Um **Acordo com Garantia** (`type: WITH_GUARANTEE`) é um combinado em que o pag
 | Pix é o método de entrada no MVP | Débito/cartão fora do escopo inicial |
 | Chave de Recebimento do App ≠ chave Pix | O handle `@usuario` é interno do Selo; a chave Pix real fica no BaaS |
 | **Recebedor precisa ter Destino de Recebimento** | Antes de criar acordo com garantia, o recebedor deve ter um destino ativo cadastrado |
+| **Pagador/criador precisa ter KYC iniciado** | `kycStatus` deve ser `SUBMITTED`, `UNDER_REVIEW` ou `APPROVED` (Fase 25) |
 
 ---
 
@@ -31,6 +32,8 @@ Um **Acordo com Garantia** (`type: WITH_GUARANTEE`) é um combinado em que o pag
 > **Fluxo de criação do acordo com garantia:**
 > ```
 > Criador informa @maria (Chave de Recebimento)
+>   → sistema verifica kycStatus do CRIADOR (Fase 25)
+>   → se PENDING: 400 "complete a verificação financeira primeiro"
 >   → sistema resolve maria = User#xyz
 >   → sistema busca destino ativo de User#xyz (Destino de Recebimento)
 >   → se não tiver: 400 "O recebedor precisa configurar um destino de recebimento"

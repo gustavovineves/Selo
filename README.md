@@ -90,6 +90,7 @@ pnpm dev:mobile
 - [Módulos do backend](docs/modules.md)
 - [Banco de dados — entidades e enums](docs/database.md)
 - [Ambientes e Segurança](docs/environments.md)
+- [Verificação Financeira (KYC Progressivo)](docs/financial-verification.md)
 
 ---
 
@@ -108,12 +109,12 @@ pnpm dev:mobile
 | Fase 22 | ✅ Concluído | CI/GitHub Actions: workflow automático em push/PR — testes unitários, E2E com PostgreSQL, build, typecheck mobile e admin |
 | Fase 23 | ✅ Concluído | Ambientes e Segurança: ThrottlerModule, CORS por ambiente, GlobalExceptionFilter, validateEnv, docs/environments.md |
 | Fase 24 | ✅ Concluído | Fitbank Sandbox / Pix Sandbox: IPaymentProvider, SimulatedProvider, FitbankSandboxProvider, webhook endpoint, 179 testes unitários, 92 E2E |
+| Fase 25 | ✅ Concluído | KYC Progressivo: verificação financeira sob demanda, FinancialProfile, CPF validado, bloqueio em acordo com garantia, 206 testes unitários, 101 E2E |
 
 ## Próximas Etapas (não implementadas)
 
 | Fase | Descrição |
 |------|-----------|
-| Fase 25 | KYC Progressivo |
 | Fase 26 | Blockchain Testnet como Prova |
 | Fase 27 | UX Final e Beta Fechado |
 
