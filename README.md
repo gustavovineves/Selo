@@ -89,6 +89,7 @@ pnpm dev:mobile
 - [Autenticação](docs/auth.md)
 - [Módulos do backend](docs/modules.md)
 - [Banco de dados — entidades e enums](docs/database.md)
+- [Ambientes e Segurança](docs/environments.md)
 
 ---
 
@@ -105,12 +106,12 @@ pnpm dev:mobile
 | Fase 20 | ✅ Concluído | Auditoria final do MVP simulado |
 | Fase 21 | ✅ Concluído | Adequação integral ao documento de visão: onboarding, busca, score, configurações, blockchain em mais eventos, admin completo |
 | Fase 22 | ✅ Concluído | CI/GitHub Actions: workflow automático em push/PR — testes unitários, E2E com PostgreSQL, build, typecheck mobile e admin |
+| Fase 23 | ✅ Concluído | Ambientes e Segurança: ThrottlerModule, CORS por ambiente, GlobalExceptionFilter, validateEnv, docs/environments.md |
 
 ## Próximas Etapas (não implementadas)
 
 | Fase | Descrição |
 |------|-----------|
-| Fase 23 | Ambientes e Segurança |
 | Fase 24 | Fitbank Sandbox / Pix Sandbox |
 | Fase 25 | KYC Progressivo |
 | Fase 26 | Blockchain Testnet como Prova |

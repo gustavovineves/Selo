@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
+import { ConfigModule, ConfigService } from '@nestjs/config';
+import { ThrottlerModule } from '@nestjs/throttler';
 import { PrismaModule } from './prisma/prisma.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { UsersModule } from './modules/users/users.module';
@@ -17,10 +18,22 @@ import { BlockchainRecordsModule } from './modules/blockchain-records/blockchain
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { AuditLogsModule } from './modules/audit-logs/audit-logs.module';
 import { AdminModule } from './modules/admin/admin.module';
+import { validateEnv } from './config/env.validation';
 
 @Module({
   imports: [
-    ConfigModule.forRoot({ isGlobal: true, envFilePath: '.env' }),
+    ConfigModule.forRoot({ isGlobal: true, envFilePath: '.env', validate: validateEnv }),
+    ThrottlerModule.forRootAsync({
+      imports: [ConfigModule],
+      useFactory: (config: ConfigService) => [
+        {
+          name: 'default',
+          ttl: parseInt(config.get('RATE_LIMIT_TTL', '60000')),
+          limit: parseInt(config.get('RATE_LIMIT_MAX', '100')),
+        },
+      ],
+      inject: [ConfigService],
+    }),
     PrismaModule,
     AuthModule,
     UsersModule,

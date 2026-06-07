@@ -1,6 +1,6 @@
 # Progresso do Projeto Selo
 
-Última atualização: 2026-06-06 (Fase 20 — Auditoria Final do MVP Simulado)
+Última atualização: 2026-06-06 (Fase 23 — Ambientes e Segurança)
 
 ---
 
@@ -1441,12 +1441,115 @@ O arquivo `.env` real nunca é commitado — apenas `.env.example` está no repo
 
 ---
 
+## 5q. Fase 23 — Ambientes e Segurança (Implementada)
+
+### Objetivo
+
+Preparar o projeto para operar com segurança mínima em development, test, staging e production futura, sem integrar dinheiro real, Pix real ou blockchain real.
+
+### Branch e estado do repositório
+
+- Branch: `dev`
+- Estado: limpo antes da fase (0 arquivos modificados, 0 diffs)
+- `.env` real: **não rastreado** — apenas `.env.example` arquivos no repositório
+
+### Arquivos criados
+
+| Arquivo | Descrição |
+|---|---|
+| `apps/api/src/config/env.validation.ts` | Valida variáveis obrigatórias no startup; pula em `NODE_ENV=test` |
+| `apps/api/src/common/filters/http-exception.filter.ts` | Filtro global de exceções; oculta detalhes em production |
+| `apps/mobile/.env.example` | Exemplo de variáveis de ambiente do app mobile |
+| `docs/environments.md` | Documentação completa de ambientes, secrets, CORS, rate limit, logs, staging |
+
+### Arquivos atualizados
+
+| Arquivo | Alteração |
+|---|---|
+| `apps/api/src/app.module.ts` | Adicionado `ThrottlerModule` + `validateEnv` no `ConfigModule` |
+| `apps/api/src/main.ts` | CORS por ambiente, `GlobalExceptionFilter` global, log level por env |
+| `apps/api/src/modules/auth/auth.controller.ts` | `ThrottlerGuard` em register/login/refresh |
+| `apps/api/src/modules/admin/admin-auth.controller.ts` | `ThrottlerGuard` em admin/auth/login |
+| `.env.example` | Variáveis completas: RATE_LIMIT_*, LOG_LEVEL, APP_PUBLIC_URL, futuras integrações comentadas |
+| `apps/api/.env.example` | Idem + ADMIN_JWT_SECRET, legado ADMIN_TOKEN documentado como deprecated |
+| `apps/admin/.env.example` | NODE_ENV adicionado como informativo |
+| `.github/workflows/ci.yml` | Adicionado `LOG_LEVEL=error`, `RATE_LIMIT_TTL=60000`, `RATE_LIMIT_MAX=10000` |
+| `docs/tests.md` | Seção "CI — Fase 23" com impacto nos testes e vars adicionadas ao CI |
+| `docs/progresso.md` | Esta seção |
+| `README.md` | Fase 23 na tabela de fases concluídas |
+
+### Dependência adicionada
+
+| Pacote | Versão | Motivo |
+|---|---|---|
+| `@nestjs/throttler` | `^5.0.0` | Rate limiting nas rotas sensíveis de auth |
+
+### Como ficaram os ambientes
+
+| Ambiente | CORS | Rate limit | Validação env | Logs |
+|---|---|---|---|---|
+| development | localhost 3001/8081 | TTL=60s, max=100 | Pula vars não-críticas | Todos os níveis |
+| test | `*` | TTL=60s, max=10000 | Pula (NODE_ENV=test) | Todos os níveis |
+| CI | `*` (test) | max=10000 | Pula (NODE_ENV=test) | Apenas error |
+| staging (futuro) | CORS_ORIGINS obrigatório | Configurável | Valida obrigatórias | Configurável |
+| production (futuro) | CORS_ORIGINS obrigatório | Configurável | Valida obrigatórias | error/warn |
+
+### Rate limit — rotas protegidas
+
+| Rota | Guard |
+|---|---|
+| `POST /api/v1/auth/register` | ThrottlerGuard |
+| `POST /api/v1/auth/login` | ThrottlerGuard |
+| `POST /api/v1/auth/refresh` | ThrottlerGuard |
+| `POST /api/v1/admin/auth/login` | ThrottlerGuard |
+
+### Segurança admin
+
+| Item | Estado |
+|---|---|
+| `AdminJwtGuard` + `AdminJwtStrategy` | ✅ Ativo (Fase 17) |
+| `ADMIN_JWT_SECRET` separado de `JWT_SECRET` | ✅ |
+| `payload.type === "admin"` verificado | ✅ |
+| Token de usuário comum rejeitado em rotas admin | ✅ |
+| `passwordHash` nunca retornado | ✅ |
+| `AdminTokenGuard` (X-Admin-Token) | ⚠️ Legado — não recomendado; documentado como deprecated |
+
+### Resultados dos comandos locais
+
+| Comando | Resultado |
+|---|---|
+| `pnpm --filter @selo/api test` | ✅ **155 testes, 10 suítes, 0 falhas** |
+| `pnpm --filter @selo/api test:e2e` | ✅ **83 testes, 1 suíte, 0 falhas** |
+| `pnpm --filter @selo/api build` | ✅ Exit 0 |
+| `pnpm --filter @selo/mobile typecheck` | ✅ Exit 0 |
+| `pnpm --filter @selo/admin typecheck` | ✅ Exit 0 |
+
+### Confirmações obrigatórias
+
+| Restrição | Status |
+|---|---|
+| Schema Prisma alterado? | **Não** |
+| Migration rodada? | **Não** |
+| Fitbank real? | **Não** |
+| Pix real? | **Não** |
+| Webhook real? | **Não** |
+| Blockchain real? | **Não** |
+| KYC? | **Não** |
+| Chat? | **Não** |
+| Regra financeira alterada? | **Não** |
+| Testes removidos para passar? | **Não** |
+| dueDate continua obrigatório? | **Sim** |
+| Dinheiro real movimentado? | **Não** |
+| Segredo real exposto? | **Não** |
+| Commit feito? | **Não** |
+
+---
+
 ## 7. Próxima Fase
 
-Fases sugeridas após o CI (Fase 22), em ordem de prioridade:
+Fases sugeridas após Ambientes e Segurança (Fase 23), em ordem de prioridade:
 
-- **Fase 23** — Ambientes e Segurança: staging isolado, variáveis por ambiente, secrets management
-- **Fase 24** — Fitbank Sandbox / Pix Sandbox: substituição do `simulate-confirmation` por webhook real
+- **Fase 24** — Fitbank Sandbox / Pix Sandbox: substituição do `simulate-confirmation` por webhook real de sandbox
 - **Fase 25** — KYC Progressivo: onboarding financeiro com CPF e validação do Banco Central
 - **Fase 26** — Blockchain Testnet: registro de hash de acordos em Ethereum/Polygon testnet
 - **Fase 27** — UX Final e Beta Fechado: animações, upload de avatar, polish geral
@@ -1522,3 +1625,4 @@ Invoke-RestMethod -Uri "http://localhost:3000/api/v1/receiving-keys/resolve/dev"
 | [docs/mobile.md](mobile.md) | App mobile: estrutura, telas, componentes, como rodar, limitações |
 | [docs/tests.md](tests.md) | Testes automatizados: estratégia, cobertura, comandos, limitações |
 | [docs/admin.md](admin.md) | Painel admin: auth real (AdminUser + JWT), endpoints, fluxo de disputa |
+| [docs/environments.md](environments.md) | Ambientes, variáveis, CORS, rate limit, logs, segurança, staging |

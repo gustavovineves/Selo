@@ -7,6 +7,7 @@ import {
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
+import { ThrottlerGuard } from '@nestjs/throttler';
 import { AdminAuthService } from './admin-auth.service';
 import { AdminLoginDto } from './dto/admin-login.dto';
 import { AdminJwtGuard } from '../../common/guards/admin-jwt.guard';
@@ -18,6 +19,7 @@ export class AdminAuthController {
   constructor(private readonly service: AdminAuthService) {}
 
   @Post('login')
+  @UseGuards(ThrottlerGuard)
   @HttpCode(HttpStatus.OK)
   login(@Body() dto: AdminLoginDto) {
     return this.service.login(dto);

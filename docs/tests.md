@@ -482,12 +482,37 @@ Nenhum valor real de produção aparece no repositório. `.env` real nunca é co
 
 ---
 
+## CI — Fase 23 (Ambientes e Segurança)
+
+A Fase 23 adicionou segurança operacional ao CI e ao backend. Os 238 testes **continuam passando sem modificação**.
+
+### Mudanças que afetam os testes
+
+| Mudança | Impacto nos testes |
+|---|---|
+| `ThrottlerModule` adicionado ao `AppModule` | Nenhum — E2E chama serviços, não HTTP; unit tests usam mocks |
+| `ThrottlerGuard` em `POST /auth/login`, `/register`, `/refresh`, `/admin/auth/login` | Nenhum — sem chamadas HTTP nos testes atuais |
+| `GlobalExceptionFilter` registrado globalmente | Nenhum — preserva formato padrão NestJS para `HttpException` |
+| `validateEnv` no `ConfigModule` | Nenhum — `NODE_ENV=test` pula validação obrigatória |
+| CORS `*` em `NODE_ENV=test` | Nenhum — E2E não usa camada HTTP |
+
+### Vars adicionadas ao CI (`.github/workflows/ci.yml`)
+
+| Variável | Valor no CI | Motivo |
+|---|---|---|
+| `LOG_LEVEL` | `error` | Reduz ruído nos logs do CI |
+| `RATE_LIMIT_TTL` | `60000` | Compatível com config do throttler |
+| `RATE_LIMIT_MAX` | `10000` | Alto — evita bloqueio em testes de carga ou E2E futuros via HTTP |
+
+---
+
 ## Próximos Passos Recomendados
 
 1. **Cobertura dos caminhos felizes de release/refund** — atualmente cobertos em manuais
 2. **Configurar Jest no Mobile** — `jest-expo` + mocks de `expo-secure-store`
 3. **Threshold de cobertura** — definir `coverageThreshold` no jest config após estabilizar
 4. **Cache de imagem Docker no CI** — evitar download repetido do `postgres:16-alpine`
+5. **Testes E2E via HTTP** — usar `supertest` para cobrir rate limiting e filtro global
 
 ---
 

@@ -43,6 +43,10 @@ jobs:
       ADMIN_TOKEN: ci-admin-token-for-testing-only
       PORT: 3000
       NODE_ENV: test
+      LOG_LEVEL: error
+      # Rate limit alto em CI para não bloquear testes de carga ou E2E
+      RATE_LIMIT_TTL: 60000
+      RATE_LIMIT_MAX: 10000
 
     steps:
       - name: Checkout
