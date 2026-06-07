@@ -64,4 +64,46 @@ export class AdminController {
   ) {
     return this.service.resolveRefund(admin.id, id, dto);
   }
+
+  // ── Usuários ─────────────────────────────────────────────────
+
+  @Get('users')
+  listUsers(
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+    @Query('status') status?: string,
+  ) {
+    return this.service.listUsers({
+      page: page ? parseInt(page, 10) : 1,
+      limit: limit ? Math.min(parseInt(limit, 10), 100) : 20,
+      status,
+    });
+  }
+
+  @Get('users/:id')
+  getUser(@Param('id') id: string) {
+    return this.service.getUser(id);
+  }
+
+  // ── Acordos ──────────────────────────────────────────────────
+
+  @Get('agreements')
+  listAgreements(
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+    @Query('status') status?: string,
+    @Query('type') type?: string,
+  ) {
+    return this.service.listAgreements({
+      page: page ? parseInt(page, 10) : 1,
+      limit: limit ? Math.min(parseInt(limit, 10), 100) : 20,
+      status,
+      type,
+    });
+  }
+
+  @Get('agreements/:id')
+  getAgreement(@Param('id') id: string) {
+    return this.service.getAgreement(id);
+  }
 }

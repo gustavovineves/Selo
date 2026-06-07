@@ -1233,16 +1233,127 @@ Auditoria ponta a ponta do MVP simulado antes de avançar para CI, Fitbank sandb
 
 ---
 
+## 5p. Fase 21 — Adequação Integral ao Documento de Visão do Produto (Implementada)
+
+### Objetivo
+
+Adequar o MVP local/simulado ao documento de produto, garantindo que o projeto contemple o que foi especificado: onboarding, busca, score explicativo, configurações, blockchain como prova em mais eventos, e admin mais completo.
+
+### Estado do repositório
+
+- Branch: `dev`
+- Git status: limpo antes desta fase
+
+### Itens implementados
+
+| Item | Arquivo(s) |
+|---|---|
+| Matriz de aderência ao documento | `docs/product-vision-alignment.md` |
+| Onboarding leve — boas-vindas | `apps/mobile/app/(onboarding)/welcome.tsx` |
+| Onboarding leve — criação de chave | `apps/mobile/app/(onboarding)/setup-key.tsx` |
+| Onboarding leve — mini tutorial | `apps/mobile/app/(onboarding)/tutorial.tsx` |
+| Busca universal MVP | `apps/mobile/app/search.tsx` |
+| Score de confiança — tela explicativa | `apps/mobile/app/trust-score.tsx` |
+| Configurações — Segurança, Privacidade, Ajuda | `apps/mobile/app/settings.tsx` |
+| Blockchain: prova na criação do acordo simples | `agreements.service.ts` — `createSimple` |
+| Blockchain: prova na criação do acordo com garantia | `agreements.service.ts` — `createGuaranteed` |
+| Blockchain: prova no aceite do acordo | `agreements.service.ts` — `accept` |
+| Blockchain: prova na abertura de contestação | `agreements.service.ts` — `openDispute` |
+| Blockchain: prova no reembolso | `agreements.service.ts` — `refund` |
+| Admin: GET /admin/users (lista de usuários) | `admin.controller.ts`, `admin.service.ts` |
+| Admin: GET /admin/users/:id (detalhe) | `admin.controller.ts`, `admin.service.ts` |
+| Admin: GET /admin/agreements (lista de acordos) | `admin.controller.ts`, `admin.service.ts` |
+| Admin: GET /admin/agreements/:id (detalhe) | `admin.controller.ts`, `admin.service.ts` |
+
+### Arquivos modificados
+
+| Arquivo | Alteração |
+|---|---|
+| `apps/mobile/app/(auth)/register.tsx` | Redirect para onboarding após cadastro |
+| `apps/mobile/app/_layout.tsx` | Rotas de onboarding, search, trust-score, settings |
+| `apps/mobile/app/index.tsx` | Verifica `welcome_seen` — redireciona para onboarding na 1ª vez |
+| `apps/mobile/app/(app)/profile.tsx` | Link para busca, configurações, tela de score |
+| `apps/api/src/modules/agreements/agreements.service.ts` | Blockchain em 4 novos eventos |
+| `apps/api/src/modules/admin/admin.service.ts` | listUsers, getUser, listAgreements, getAgreement |
+| `apps/api/src/modules/admin/admin.controller.ts` | 4 novos endpoints admin |
+
+### Cobertura de BlockchainRecord após Fase 21
+
+| Evento | Status |
+|---|---|
+| Acordo criado (simples) | ✅ PENDING |
+| Acordo criado (com garantia) | ✅ PENDING |
+| Acordo aceito | ✅ PENDING |
+| Valor protegido (FUNDS_LOCKED) | ✅ PENDING (payments.service) |
+| Contestação aberta | ✅ PENDING |
+| Reembolso (user) | ✅ PENDING |
+| Conclusão (dupla confirmação / payout) | ✅ PENDING (agreements.service) |
+| Resolução admin (release) | ✅ PENDING (admin.service) |
+| Resolução admin (refund) | ✅ PENDING (admin.service) |
+
+### Novos endpoints admin
+
+| Método | Rota | Auth | Descrição |
+|---|---|---|---|
+| GET | `/api/v1/admin/users` | AdminJwtGuard | Lista usuários com paginação e filtro por status |
+| GET | `/api/v1/admin/users/:id` | AdminJwtGuard | Detalhe do usuário |
+| GET | `/api/v1/admin/agreements` | AdminJwtGuard | Lista acordos com paginação e filtros |
+| GET | `/api/v1/admin/agreements/:id` | AdminJwtGuard | Detalhe completo do acordo |
+
+### Onboarding mobile
+
+Fluxo implementado:
+1. Primeira abertura do app (sem token, sem `welcome_seen`) → `/(onboarding)/welcome`
+2. Tela de boas-vindas: "A carteira dos seus combinados" + 3 features + Criar conta / Já tenho conta
+3. Após cadastro: → `/(onboarding)/setup-key` (criar Chave de Recebimento opcional)
+4. → `/(onboarding)/tutorial` (4 slides: combinado simples, valor protegido, contestação, score)
+5. → `/(app)/home`
+
+Usuários existentes que já têm token → direto para home (sem mostrar onboarding novamente).
+
+### Configurações mobile
+
+Tela `/settings` com 3 seções expansíveis:
+- **Segurança**: logout, sessões (em breve), biometria (em breve), nota de segurança
+- **Privacidade**: o que é armazenado, o que não é armazenado, Termos/Política (em breve)
+- **Ajuda**: combinado simples, valor protegido, contestação formal, Chave ≠ Pix, score
+
+### Confirmações obrigatórias
+
+| Restrição | Status |
+|---|---|
+| Schema Prisma alterado? | **Não** |
+| Migration rodada? | **Não** |
+| Fitbank real integrado? | **Não** |
+| Pix real? | **Não** |
+| Webhook real? | **Não** |
+| Payout real? | **Não** |
+| Refund real? | **Não** |
+| Blockchain real? | **Não** |
+| KYC? | **Não** |
+| Chat? | **Não** |
+| Push notifications reais? | **Não** |
+| Regra financeira alterada? | **Não** |
+| dueDate continua obrigatório? | **Sim** |
+| Chave de Recebimento continua interna? | **Sim** |
+| Destino de Recebimento continua separado da chave? | **Sim** |
+| Disputa continua formal e sem chat? | **Sim** |
+| Resolução continua humana/admin? | **Sim** |
+| Dinheiro real movimentado? | **Não** |
+| Commit feito? | **Não** |
+
+---
+
 ## 7. Próxima Fase
 
-Fases sugeridas após a Auditoria Final (Fase 20), em ordem de prioridade:
+Fases sugeridas após a Adequação Integral (Fase 21), em ordem de prioridade:
 
-- **Fase 21** — CI/GitHub Actions: `pnpm --filter @selo/api test` em cada PR
-- **Fase 22** — Ambientes e Segurança: staging isolado, variáveis por ambiente, secrets management
-- **Fase 23** — Fitbank Sandbox / Pix Sandbox: substituição do `simulate-confirmation` por webhook real
-- **Fase 24** — KYC Progressivo: onboarding financeiro com CPF e validação do Banco Central
-- **Fase 25** — Blockchain Testnet: registro de hash de acordos em Ethereum/Polygon testnet
-- **Fase 26** — UX Final e Beta Fechado: animações, upload de avatar, polish geral
+- **Fase 22** — CI/GitHub Actions: `pnpm --filter @selo/api test` em cada PR
+- **Fase 23** — Ambientes e Segurança: staging isolado, variáveis por ambiente, secrets management
+- **Fase 24** — Fitbank Sandbox / Pix Sandbox: substituição do `simulate-confirmation` por webhook real
+- **Fase 25** — KYC Progressivo: onboarding financeiro com CPF e validação do Banco Central
+- **Fase 26** — Blockchain Testnet: registro de hash de acordos em Ethereum/Polygon testnet
+- **Fase 27** — UX Final e Beta Fechado: animações, upload de avatar, polish geral
 
 Não implementar sem instrução explícita: Fitbank real, blockchain real, KYC, push notifications reais.
 

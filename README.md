@@ -103,17 +103,18 @@ pnpm dev:mobile
 | Fase 18 | ✅ Concluído | Testes E2E com PostgreSQL real (83 testes, 238 total) |
 | Fase 19 | ✅ Concluído | Polimento UX Mobile: Date Picker + Time Wheel para prazo |
 | Fase 20 | ✅ Concluído | Auditoria final do MVP simulado |
+| Fase 21 | ✅ Concluído | Adequação integral ao documento de visão: onboarding, busca, score, configurações, blockchain em mais eventos, admin completo |
 
 ## Próximas Etapas (não implementadas)
 
 | Fase | Descrição |
 |------|-----------|
-| Fase 21 | CI/GitHub Actions |
-| Fase 22 | Ambientes e Segurança |
-| Fase 23 | Fitbank Sandbox / Pix Sandbox |
-| Fase 24 | KYC Progressivo |
-| Fase 25 | Blockchain Testnet como Prova |
-| Fase 26 | UX Final e Beta Fechado |
+| Fase 22 | CI/GitHub Actions |
+| Fase 23 | Ambientes e Segurança |
+| Fase 24 | Fitbank Sandbox / Pix Sandbox |
+| Fase 25 | KYC Progressivo |
+| Fase 26 | Blockchain Testnet como Prova |
+| Fase 27 | UX Final e Beta Fechado |
 
 ---
 

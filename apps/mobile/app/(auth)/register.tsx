@@ -41,7 +41,7 @@ export default function RegisterScreen() {
         email: email.trim().toLowerCase(),
         password,
       });
-      router.replace('/(app)/home');
+      router.replace('/(onboarding)/setup-key');
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Não foi possível criar a conta.');
     } finally {

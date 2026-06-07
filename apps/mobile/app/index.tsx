@@ -7,11 +7,18 @@ import { Colors } from '../src/theme';
 export default function Index() {
   const [ready, setReady] = useState(false);
   const [hasToken, setHasToken] = useState(false);
+  const [seenWelcome, setSeenWelcome] = useState(false);
 
   useEffect(() => {
-    SecureStore.getItemAsync('accessToken')
-      .then((token) => setHasToken(!!token))
-      .catch(() => setHasToken(false))
+    Promise.all([
+      SecureStore.getItemAsync('accessToken'),
+      SecureStore.getItemAsync('welcome_seen'),
+    ])
+      .then(([token, seen]) => {
+        setHasToken(!!token);
+        setSeenWelcome(!!seen);
+      })
+      .catch(() => {})
       .finally(() => setReady(true));
   }, []);
 
@@ -24,5 +31,6 @@ export default function Index() {
   }
 
   if (hasToken) return <Redirect href="/(app)/home" />;
-  return <Redirect href="/(auth)/login" />;
+  if (seenWelcome) return <Redirect href="/(auth)/login" />;
+  return <Redirect href="/(onboarding)/welcome" />;
 }

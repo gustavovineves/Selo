@@ -450,19 +450,24 @@ export default function ProfileScreen() {
 
       {/* ── Score Card ─────────────────────────────────────────────── */}
       {trustScore && (
-        <View style={[styles.card, styles.scoreCard]}>
+        <TouchableOpacity
+          style={[styles.card, styles.scoreCard]}
+          onPress={() => router.push({ pathname: '/trust-score', params: { score: String(trustScore.score), level: trustScore.level } } as any)}
+          activeOpacity={0.8}
+        >
           <View style={styles.scoreCardHeader}>
             <Ionicons name="shield-checkmark-outline" size={20} color={LEVEL_COLOR[trustScore.level]} />
             <Text style={styles.cardTitle}>Score de confiança</Text>
+            <Ionicons name="chevron-forward" size={14} color={Colors.textMuted} style={{ marginLeft: 'auto' }} />
           </View>
           <Text style={[styles.scoreNumber, { color: LEVEL_COLOR[trustScore.level] }]}>
             {trustScore.score}
           </Text>
           <Text style={styles.scoreLevelLabel}>{LEVEL_LABEL[trustScore.level]}</Text>
           <Text style={styles.scoreExplain}>
-            Seu score ajuda outras pessoas a entenderem seu histórico no Selo. Ele cresce conforme você cumpre combinados.
+            Toque para entender como seu score é calculado.
           </Text>
-        </View>
+        </TouchableOpacity>
       )}
 
       {/* ── Receiving Key Section ───────────────────────────────────── */}
@@ -839,6 +844,18 @@ export default function ProfileScreen() {
         <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/edit-profile')}>
           <Ionicons name="person-outline" size={20} color={Colors.textSecondary} />
           <Text style={styles.menuText}>Editar perfil</Text>
+          <Ionicons name="chevron-forward" size={16} color={Colors.textMuted} />
+        </TouchableOpacity>
+
+        <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/search' as any)}>
+          <Ionicons name="search-outline" size={20} color={Colors.textSecondary} />
+          <Text style={styles.menuText}>Buscar acordos e pessoas</Text>
+          <Ionicons name="chevron-forward" size={16} color={Colors.textMuted} />
+        </TouchableOpacity>
+
+        <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/settings' as any)}>
+          <Ionicons name="settings-outline" size={20} color={Colors.textSecondary} />
+          <Text style={styles.menuText}>Configurações</Text>
           <Ionicons name="chevron-forward" size={16} color={Colors.textMuted} />
         </TouchableOpacity>
 

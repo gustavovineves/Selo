@@ -30,6 +30,7 @@ export default function RootLayout() {
         <Stack.Screen name="index" options={{ headerShown: false }} />
         <Stack.Screen name="(auth)" options={{ headerShown: false }} />
         <Stack.Screen name="(app)" options={{ headerShown: false }} />
+        <Stack.Screen name="(onboarding)" options={{ headerShown: false }} />
         <Stack.Screen name="create-agreement" options={{ headerShown: false }} />
         <Stack.Screen
           name="agreement/[id]"
@@ -47,6 +48,9 @@ export default function RootLayout() {
             headerTintColor: '#ffffff',
           }}
         />
+        <Stack.Screen name="search" options={{ headerShown: false }} />
+        <Stack.Screen name="trust-score" options={{ headerShown: false }} />
+        <Stack.Screen name="settings" options={{ headerShown: false }} />
       </Stack>
     </SafeAreaProvider>
   );

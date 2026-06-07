@@ -177,18 +177,42 @@ Detalhe completo organizado em 6 blocos:
 
 ---
 
-## Endpoints Consumidos
-
-| Método | Rota | Tela |
-|---|---|---|
-| GET | `/api/v1/admin/health` | Login (validação do token) |
-| GET | `/api/v1/admin/stats` | Dashboard |
-| GET | `/api/v1/admin/disputes` | Lista de contestações |
-| GET | `/api/v1/admin/disputes/:id` | Detalhe da contestação |
-| POST | `/api/v1/admin/disputes/:id/resolve-release` | Modal "Liberar ao recebedor" |
-| POST | `/api/v1/admin/disputes/:id/resolve-refund` | Modal "Reembolsar pagador" |
+## Endpoints Disponíveis
 
 Todos os endpoints enviam `Authorization: Bearer <accessToken>` no header (JWT admin obtido no login).
+
+### Dashboard e Disputas
+
+| Método | Rota | Descrição |
+|---|---|---|
+| GET | `/api/v1/admin/health` | Health check do painel |
+| GET | `/api/v1/admin/stats` | Estatísticas gerais |
+| GET | `/api/v1/admin/disputes` | Lista de contestações (paginado, filtro por status) |
+| GET | `/api/v1/admin/disputes/:id` | Detalhe completo da contestação |
+| POST | `/api/v1/admin/disputes/:id/resolve-release` | Resolver liberando ao recebedor |
+| POST | `/api/v1/admin/disputes/:id/resolve-refund` | Resolver reembolsando ao pagador |
+
+### Usuários (Fase 21)
+
+| Método | Rota | Descrição |
+|---|---|---|
+| GET | `/api/v1/admin/users` | Lista usuários (paginado, filtro por status) |
+| GET | `/api/v1/admin/users/:id` | Detalhe do usuário (perfil, score, chaves, contadores) |
+
+**Query params de `/admin/users`:**
+- `page` (default 1), `limit` (default 20, máx 100), `status` (filtro por UserStatus)
+
+**Não retorna:** `passwordHash`, tokens, dados sensíveis.
+
+### Acordos (Fase 21)
+
+| Método | Rota | Descrição |
+|---|---|---|
+| GET | `/api/v1/admin/agreements` | Lista acordos (paginado, filtros) |
+| GET | `/api/v1/admin/agreements/:id` | Detalhe completo do acordo |
+
+**Query params de `/admin/agreements`:**
+- `page` (default 1), `limit` (default 20, máx 100), `status` (filtro por operationalStatus), `type` (SIMPLE ou WITH_GUARANTEE)
 
 ---
 

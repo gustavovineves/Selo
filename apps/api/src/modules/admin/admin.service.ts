@@ -727,6 +727,137 @@ export class AdminService {
     return this.getDispute(disputeId);
   }
 
+  // ── Usuários ─────────────────────────────────────────────────
+
+  async listUsers(query: { page?: number; limit?: number; status?: string }) {
+    const { page = 1, limit = 20, status } = query;
+    const skip = (page - 1) * limit;
+
+    const where: Prisma.UserWhereInput = status ? { status: status as any } : {};
+
+    const [data, total] = await Promise.all([
+      this.prisma.user.findMany({
+        where,
+        skip,
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+        select: {
+          id: true,
+          email: true,
+          status: true,
+          kycStatus: true,
+          createdAt: true,
+          updatedAt: true,
+          profile: {
+            select: { fullName: true, displayName: true, avatarUrl: true },
+          },
+          trustScore: {
+            select: { score: true, level: true },
+          },
+          _count: {
+            select: { createdAgreements: true, openedDisputes: true },
+          },
+        },
+      }),
+      this.prisma.user.count({ where }),
+    ]);
+
+    return { data, total, page, limit };
+  }
+
+  async getUser(userId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        email: true,
+        status: true,
+        kycStatus: true,
+        createdAt: true,
+        updatedAt: true,
+        profile: true,
+        trustScore: {
+          select: { score: true, level: true, totalAgreements: true, completedAgreements: true, disputesOpened: true, disputesWon: true, disputesLost: true },
+        },
+        receivingKeys: {
+          select: { id: true, key: true, normalizedKey: true, status: true, createdAt: true },
+          where: { status: { not: 'DELETED' } },
+        },
+        _count: {
+          select: { createdAgreements: true, openedDisputes: true, notifications: true },
+        },
+      },
+    });
+
+    if (!user) throw new NotFoundException('Usuário não encontrado.');
+    return user;
+  }
+
+  // ── Acordos ──────────────────────────────────────────────────
+
+  async listAgreements(query: { page?: number; limit?: number; status?: string; type?: string }) {
+    const { page = 1, limit = 20, status, type } = query;
+    const skip = (page - 1) * limit;
+
+    const where: Prisma.AgreementWhereInput = {
+      ...(status ? { operationalStatus: status as any } : {}),
+      ...(type ? { type: type as any } : {}),
+    };
+
+    const [data, total] = await Promise.all([
+      this.prisma.agreement.findMany({
+        where,
+        skip,
+        take: limit,
+        orderBy: { updatedAt: 'desc' },
+        select: {
+          id: true,
+          type: true,
+          operationalStatus: true,
+          financialStatus: true,
+          title: true,
+          amount: true,
+          currency: true,
+          dueDate: true,
+          createdAt: true,
+          updatedAt: true,
+          completedAt: true,
+          canceledAt: true,
+          disputedAt: true,
+          createdBy: { select: { id: true, profile: { select: { fullName: true, displayName: true } } } },
+          payer: { select: { id: true, profile: { select: { fullName: true, displayName: true } } } },
+          receiver: { select: { id: true, profile: { select: { fullName: true, displayName: true } } } },
+          dispute: { select: { id: true, status: true, reason: true } },
+          _count: { select: { participants: true } },
+        },
+      }),
+      this.prisma.agreement.count({ where }),
+    ]);
+
+    return { data, total, page, limit };
+  }
+
+  async getAgreement(agreementId: string) {
+    const agreement = await this.prisma.agreement.findUnique({
+      where: { id: agreementId },
+      include: {
+        createdBy: { select: { id: true, email: true, profile: { select: { fullName: true, displayName: true } } } },
+        payer: { select: { id: true, email: true, profile: { select: { fullName: true, displayName: true } } } },
+        receiver: { select: { id: true, email: true, profile: { select: { fullName: true, displayName: true } } } },
+        participants: {
+          include: { user: { select: { id: true, profile: { select: { fullName: true, displayName: true } } } } },
+        },
+        financialGuarantee: true,
+        dispute: { include: { messages: { orderBy: { createdAt: 'asc' }, take: 20 } } },
+        events: { orderBy: { createdAt: 'asc' } },
+        blockchainRecord: true,
+      },
+    });
+
+    if (!agreement) throw new NotFoundException('Acordo não encontrado.');
+    return agreement;
+  }
+
   // ── Helpers ──────────────────────────────────────────────────
 
   private assertDisputeOpen(status: DisputeStatus): void {

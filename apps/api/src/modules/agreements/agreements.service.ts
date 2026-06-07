@@ -306,6 +306,17 @@ export class AgreementsService {
       return a;
     });
 
+    // Blockchain: prova de criação do acordo (PENDING — submissão real na Fase 26)
+    this.blockchainRecords
+      .createPending(agreement.id, {
+        event: 'AGREEMENT_CREATED',
+        agreementId: agreement.id,
+        type: 'SIMPLE',
+        contentHash: agreement.contentHash,
+        createdAt: new Date().toISOString(),
+      })
+      .catch(() => {});
+
     this.notifications
       .send(
         counterpartyId,
@@ -489,6 +500,19 @@ export class AgreementsService {
       resourceId: agreement.id,
       newData: { type: 'WITH_GUARANTEE', amount: dto.amount },
     });
+
+    // Blockchain: prova de criação do acordo com garantia (PENDING — submissão real na Fase 26)
+    this.blockchainRecords
+      .createPending(agreement.id, {
+        event: 'AGREEMENT_CREATED',
+        agreementId: agreement.id,
+        type: 'WITH_GUARANTEE',
+        amount: dto.amount,
+        currency: dto.currency ?? 'BRL',
+        contentHash: agreement.contentHash,
+        createdAt: new Date().toISOString(),
+      })
+      .catch(() => {});
 
     const cur = dto.currency ?? 'BRL';
     this.notifications
@@ -1304,6 +1328,17 @@ export class AgreementsService {
       'Reembolso solicitado em acordo com garantia',
     );
 
+    // Blockchain: prova de reembolso (PENDING — submissão real na Fase 26)
+    this.blockchainRecords
+      .createPending(agreementId, {
+        event: 'REFUND_COMPLETED',
+        agreementId,
+        requestedById: userId,
+        amount: guarantee.amount.toString(),
+        refundedAt: new Date().toISOString(),
+      })
+      .catch(() => {});
+
     if (agreement.payerId) {
       this.notifications
         .send(
@@ -1429,6 +1464,17 @@ export class AgreementsService {
         `Sua contestação para "${agreement.title}" foi registrada. O valor ficou travado até análise.`,
         { agreementId },
       )
+      .catch(() => {});
+
+    // Blockchain: prova de abertura de contestação (PENDING — submissão real na Fase 26)
+    this.blockchainRecords
+      .createPending(agreementId, {
+        event: 'DISPUTE_OPENED',
+        agreementId,
+        openedById: userId,
+        reason: dto.reason,
+        openedAt: new Date().toISOString(),
+      })
       .catch(() => {});
 
     for (const p of agreement.participants) {
@@ -1961,6 +2007,16 @@ export class AgreementsService {
         },
       });
     });
+
+    // Blockchain: prova de aceite do acordo (PENDING — submissão real na Fase 26)
+    this.blockchainRecords
+      .createPending(id, {
+        event: 'AGREEMENT_ACCEPTED',
+        agreementId: id,
+        acceptedById: userId,
+        acceptedAt: new Date().toISOString(),
+      })
+      .catch(() => {});
 
     this.notifications
       .send(
