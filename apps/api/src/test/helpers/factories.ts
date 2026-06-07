@@ -361,7 +361,7 @@ export function createPrismaMock() {
     trustScore: { findUnique: fn(), update: fn() },
     trustScoreEvent: { create: fn() },
     auditLog: { create: fn() },
-    blockchainRecord: { create: fn(), upsert: fn() },
+    blockchainRecord: { create: fn(), upsert: fn(), findMany: fn(), findFirst: fn() },
     adminUser: { findUnique: fn(), update: fn() },
     $connect: fn(),
     $disconnect: fn(),

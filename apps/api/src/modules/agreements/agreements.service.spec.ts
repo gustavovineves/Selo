@@ -30,7 +30,7 @@ describe('AgreementsService', () => {
   let notifications: jest.Mocked<Pick<NotificationsService, 'send'>>;
   let auditLogs: jest.Mocked<Pick<AuditLogsService, 'log'>>;
   let trustScore: jest.Mocked<Pick<TrustScoreService, 'recordEvent'>>;
-  let blockchainRecords: jest.Mocked<Pick<BlockchainRecordsService, 'createPending'>>;
+  let blockchainRecords: jest.Mocked<Pick<BlockchainRecordsService, 'createPending' | 'createProof'>>;
   let receivingDestinations: jest.Mocked<Pick<ReceivingDestinationsService, 'findAnyActive' | 'maskValue'>>;
 
   const CREATOR_ID = 'user-a';
@@ -50,7 +50,10 @@ describe('AgreementsService', () => {
     notifications = { send: jest.fn().mockResolvedValue({}) };
     auditLogs = { log: jest.fn().mockResolvedValue({}) };
     trustScore = { recordEvent: jest.fn().mockResolvedValue(undefined) };
-    blockchainRecords = { createPending: jest.fn().mockResolvedValue(undefined) };
+    blockchainRecords = {
+      createPending: jest.fn().mockResolvedValue(undefined),
+      createProof: jest.fn().mockResolvedValue(undefined),
+    };
     receivingDestinations = {
       findAnyActive: jest.fn(),
       maskValue: jest.fn().mockReturnValue('e***@test.com'),

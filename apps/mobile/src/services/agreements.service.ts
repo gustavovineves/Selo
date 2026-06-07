@@ -8,6 +8,7 @@ import type {
   PaymentIntentResponse,
   OpenDisputePayload,
   DisputeDetail,
+  AgreementProof,
 } from '../types/api';
 
 export interface ListAgreementsParams {
@@ -63,4 +64,6 @@ export const agreementsService = {
     api.post<AgreementDetail>(`/agreements/${id}/dispute`, payload),
 
   getDispute: (id: string) => api.get<DisputeDetail>(`/agreements/${id}/dispute`),
+
+  getProofs: (id: string) => api.get<AgreementProof[]>(`/agreements/${id}/proofs`),
 };

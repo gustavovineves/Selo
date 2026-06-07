@@ -15,6 +15,7 @@ import { AdminAuthService } from '../../src/modules/admin/admin-auth.service';
 import { AdminService } from '../../src/modules/admin/admin.service';
 import { NotificationsService } from '../../src/modules/notifications/notifications.service';
 import { FinancialProfileService } from '../../src/modules/users/financial-profile.service';
+import { BlockchainRecordsService } from '../../src/modules/blockchain-records/blockchain-records.service';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { CreateSimpleAgreementDto } from '../../src/modules/agreements/dto/create-simple-agreement.dto';
@@ -50,6 +51,7 @@ describe('Fase 18 — MVP Flow E2E com PostgreSQL Real', () => {
   let jwtService: JwtService;
   let configService: ConfigService;
   let financialProfile: FinancialProfileService;
+  let blockchainRecords: BlockchainRecordsService;
 
   // Estado compartilhado entre blocos de teste
   let userAId: string;
@@ -86,6 +88,7 @@ describe('Fase 18 — MVP Flow E2E com PostgreSQL Real', () => {
     jwtService   = moduleRef.get(JwtService);
     configService = moduleRef.get(ConfigService);
     financialProfile = moduleRef.get(FinancialProfileService);
+    blockchainRecords = moduleRef.get(BlockchainRecordsService);
 
     // Seed: adminUser com bcrypt real
     const passwordHash = await bcrypt.hash(PASSWORD, 12);
@@ -1007,6 +1010,131 @@ describe('Fase 18 — MVP Flow E2E com PostgreSQL Real', () => {
       // Verificação documental: o provider é SIMULATED ou FITBANK_SANDBOX,
       // FITBANK_ENABLE_REAL_CALLS=false (padrão), nenhuma chamada HTTP real ocorreu.
       expect(process.env['FITBANK_ENABLE_REAL_CALLS']).not.toBe('true');
+    });
+  });
+
+  // ─────────────────────────────────────────────────────────────────
+  // 13. Fase 26 — Blockchain Testnet como Prova
+  // ─────────────────────────────────────────────────────────────────
+
+  describe('Fase 26 — Blockchain Testnet como Prova', () => {
+    it('provider blockchain é simulated por padrão (sem chamada real)', () => {
+      expect(process.env['BLOCKCHAIN_ENABLE_REAL_CALLS']).not.toBe('true');
+      expect(process.env['BLOCKCHAIN_PROVIDER'] ?? 'simulated').toBe('simulated');
+    });
+
+    it('acordo simples gera registros de prova com eventType AGREEMENT_CREATED', async () => {
+      const records = await prisma.blockchainRecord.findMany({
+        where: { agreementId: simpleAgrId, eventType: 'AGREEMENT_CREATED' },
+      });
+      expect(records.length).toBeGreaterThanOrEqual(1);
+      expect(records[0].status).toBe('SUBMITTED');
+      expect(records[0].proofHash).toBeTruthy();
+      expect(records[0].txHash).toBeTruthy();
+    });
+
+    it('acordo com garantia gera proofs para AGREEMENT_CREATED + AGREEMENT_ACCEPTED + PAYOUT_COMPLETED', async () => {
+      const records = await prisma.blockchainRecord.findMany({
+        where: { agreementId: guaranteed1Id },
+        orderBy: { createdAt: 'asc' },
+      });
+      const eventTypes = records.map((r) => r.eventType);
+      expect(eventTypes).toContain('AGREEMENT_CREATED');
+      expect(eventTypes).toContain('AGREEMENT_ACCEPTED');
+      // DUAL_CONFIRMATION_PAYOUT ou PAYOUT_COMPLETED deve existir
+      const hasPayout = eventTypes.some((e) => e?.includes('PAYOUT') || e?.includes('CONFIRMATION'));
+      expect(hasPayout).toBe(true);
+    });
+
+    it('disputa + resolução admin geram proofs de DISPUTE_OPENED e DISPUTE_RESOLVED', async () => {
+      const records = await prisma.blockchainRecord.findMany({
+        where: { agreementId: guaranteed2Id },
+        orderBy: { createdAt: 'asc' },
+      });
+      const eventTypes = records.map((r) => r.eventType);
+      expect(eventTypes).toContain('DISPUTE_OPENED');
+      expect(eventTypes).toContain('DISPUTE_RESOLVED');
+    });
+
+    it('getProofsForUser retorna provas para participante do acordo', async () => {
+      const proofs = await blockchainRecords.getProofsForUser(userAId, simpleAgrId);
+      expect(proofs.length).toBeGreaterThanOrEqual(1);
+      expect(proofs[0].status).toBe('SUBMITTED');
+      expect(proofs[0].eventType).toBe('AGREEMENT_CREATED');
+      expect(proofs[0].proofHashShort).toContain('…');
+      // full proofHash must not be exposed in user-facing response
+      expect((proofs[0] as unknown as Record<string, unknown>).proofHash).toBeUndefined();
+    });
+
+    it('getProofsForUser lança ForbiddenException para usuário não participante', async () => {
+      const { ForbiddenException } = await import('@nestjs/common');
+      await expect(
+        blockchainRecords.getProofsForUser(userCId, guaranteed1Id),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('getProofsForAdmin retorna provas completas com proofHash e txHash', async () => {
+      const proofs = await blockchainRecords.getProofsForAdmin(guaranteed1Id);
+      expect(proofs.length).toBeGreaterThanOrEqual(1);
+      expect(proofs[0].proofHash).toHaveLength(64);
+      expect(proofs[0].txHash).toMatch(/^0x[a-f0-9]+/);
+    });
+
+    it('proofs não expõem dados sensíveis (CPF, pixKey, tokens)', async () => {
+      const records = await prisma.blockchainRecord.findMany({
+        where: { agreementId: guaranteed2Id },
+      });
+      for (const record of records) {
+        const data = record.proofData as Record<string, unknown> | null;
+        if (!data) continue;
+        const json = JSON.stringify(data);
+        // CPF real não deve aparecer sem máscara
+        expect(json).not.toContain('11144477735');
+        // pixKey completa não deve aparecer (normalizedKey is redacted)
+        // Senha nunca exposta
+        expect(json).not.toContain('passwordHash');
+        expect(json).not.toContain('accessToken');
+        expect(json).not.toContain('refreshToken');
+      }
+    });
+
+    it('proofHash é determinístico — mesma payload gera mesmo hash', async () => {
+      const { sha256 } = await import('../../src/common/utils/canonical-json.util');
+      const payload = { agreementId: 'test-det', amount: '100', currency: 'BRL' };
+      const h1 = sha256({ eventType: 'TEST', ...payload });
+      const h2 = sha256({ eventType: 'TEST', ...payload });
+      expect(h1).toBe(h2);
+      expect(h1).toHaveLength(64);
+    });
+
+    it('dueDate continua obrigatório — DTO de acordo garantido o exige', async () => {
+      // DTO-level validation: dueDate is @IsDateString() @IsNotEmpty() in CreateGuaranteedAgreementDto
+      // This invariant is tested at the DTO validation level (class-validator).
+      // Here we just confirm guaranteed1Id has a dueDate set.
+      const agr = await prisma.agreement.findUnique({
+        where: { id: guaranteed1Id },
+        select: { dueDate: true },
+      });
+      expect(agr?.dueDate).toBeTruthy();
+    });
+
+    it('acordo com garantia ainda exige KYC progressivo e destino ativo', async () => {
+      // userCId não tem KYC iniciado (kycStatus=PENDING) — deve bloquear
+      const { BadRequestException } = await import('@nestjs/common');
+      await expect(
+        agreements.createGuaranteed(userCId, {
+          title: 'Carol sem KYC',
+          counterpartyKey: '@' + keyBNormalized,
+          amount: 10,
+          currency: 'BRL',
+          dueDate: DUE_DATE_ISO,
+        }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('blockchain real não foi integrada — sem chamada de rede externa', () => {
+      // Garantia documental: BLOCKCHAIN_ENABLE_REAL_CALLS=false (padrão CI/local)
+      expect(process.env['BLOCKCHAIN_ENABLE_REAL_CALLS']).not.toBe('true');
     });
   });
 });

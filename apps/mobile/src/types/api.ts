@@ -1,3 +1,17 @@
+export interface AgreementProof {
+  id: string;
+  eventType: string | null;
+  status: 'PENDING' | 'SUBMITTED' | 'CONFIRMED' | 'FAILED';
+  proofHashShort: string | null;
+  txHashShort: string | null;
+  network: string;
+  provider: string;
+  createdAt: string;
+  submittedAt: string | null;
+  confirmedAt: string | null;
+  humanMessage: string;
+}
+
 export type KycStatus = 'PENDING' | 'SUBMITTED' | 'UNDER_REVIEW' | 'APPROVED' | 'REJECTED';
 
 export interface FinancialProfileResponse {

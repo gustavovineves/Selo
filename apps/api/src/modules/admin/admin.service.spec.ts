@@ -18,7 +18,7 @@ describe('AdminService', () => {
   let prisma: ReturnType<typeof createPrismaMock>;
   let auditLogs: jest.Mocked<Pick<AuditLogsService, 'log'>>;
   let trustScore: jest.Mocked<Pick<TrustScoreService, 'recordEvent'>>;
-  let blockchainRecords: jest.Mocked<Pick<BlockchainRecordsService, 'createPending'>>;
+  let blockchainRecords: jest.Mocked<Pick<BlockchainRecordsService, 'createPending' | 'createProof'>>;
   let notifications: jest.Mocked<Pick<NotificationsService, 'send'>>;
 
   const ADMIN_ID = 'system-admin';
@@ -55,7 +55,10 @@ describe('AdminService', () => {
     prisma = createPrismaMock();
     auditLogs = { log: jest.fn().mockResolvedValue({}) };
     trustScore = { recordEvent: jest.fn().mockResolvedValue(undefined) };
-    blockchainRecords = { createPending: jest.fn().mockResolvedValue(undefined) };
+    blockchainRecords = {
+      createPending: jest.fn().mockResolvedValue(undefined),
+      createProof: jest.fn().mockResolvedValue(undefined),
+    };
     notifications = { send: jest.fn().mockResolvedValue({}) };
 
     const module = await Test.createTestingModule({

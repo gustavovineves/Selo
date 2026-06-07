@@ -431,8 +431,7 @@ export class AdminService {
       );
     }
 
-    await this.blockchainRecords.createPending(agreement.id, {
-      event: 'DISPUTE_RESOLVED',
+    await this.blockchainRecords.createProof(agreement.id, 'DISPUTE_RESOLVED', {
       decision: 'RELEASE_TO_RECEIVER',
       disputeId,
       agreementId: agreement.id,
@@ -691,8 +690,7 @@ export class AdminService {
       );
     }
 
-    await this.blockchainRecords.createPending(agreement.id, {
-      event: 'DISPUTE_RESOLVED',
+    await this.blockchainRecords.createProof(agreement.id, 'DISPUTE_RESOLVED', {
       decision: 'REFUND_TO_PAYER',
       disputeId,
       agreementId: agreement.id,
@@ -872,7 +870,7 @@ export class AdminService {
         financialGuarantee: true,
         dispute: { include: { messages: { orderBy: { createdAt: 'asc' }, take: 20 } } },
         events: { orderBy: { createdAt: 'asc' } },
-        blockchainRecord: true,
+        blockchainRecords: { orderBy: { createdAt: 'asc' as const } },
       },
     });
 

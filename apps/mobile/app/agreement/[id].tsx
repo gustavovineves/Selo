@@ -25,6 +25,7 @@ import type {
   AgreementParticipant,
   PaymentIntentResponse,
   DisputeDetail,
+  AgreementProof,
 } from '../../src/types/api';
 
 // ── Utilities ──────────────────────────────────────────────────────
@@ -176,6 +177,8 @@ export default function AgreementDetailScreen() {
   const [evidenceSubmitting, setEvidenceSubmitting] = useState(false);
   const [evidenceError, setEvidenceError] = useState<string | null>(null);
 
+  const [proofs, setProofs] = useState<AgreementProof[]>([]);
+
   const loadData = useCallback(async () => {
     if (!id) return;
     setError(null);
@@ -196,6 +199,13 @@ export default function AgreementDetailScreen() {
         }
       } else {
         setDisputeDetail(null);
+      }
+
+      try {
+        const pp = await agreementsService.getProofs(id);
+        setProofs(pp);
+      } catch {
+        setProofs([]);
       }
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : '';
@@ -832,10 +842,75 @@ export default function AgreementDetailScreen() {
           </View>
         ) : null}
 
+        {/* ── 14. Proofs section ── */}
+        {proofs.length > 0 ? (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Registros de prova</Text>
+            <Text style={styles.proofDisclaimer}>
+              Alguns eventos deste combinado geram registros de prova para aumentar a confiança e a rastreabilidade.
+              {'\n'}O dinheiro não fica na blockchain.
+            </Text>
+            {proofs.map((proof) => (
+              <View key={proof.id} style={styles.proofItem}>
+                <View style={styles.proofItemHeader}>
+                  <Text style={styles.proofEventLabel}>{proofEventLabel(proof.eventType)}</Text>
+                  <Text style={[styles.proofStatusBadge, proofStatusStyle(proof.status)]}>
+                    {proofStatusLabel(proof.status)}
+                  </Text>
+                </View>
+                {proof.proofHashShort ? (
+                  <Text style={styles.proofHashText}>Prova: {proof.proofHashShort}</Text>
+                ) : null}
+                {proof.txHashShort ? (
+                  <Text style={styles.proofHashText}>Tx: {proof.txHashShort}</Text>
+                ) : null}
+                <Text style={styles.proofDate}>{formatDateWithTime(proof.createdAt)}</Text>
+              </View>
+            ))}
+          </View>
+        ) : null}
+
         <View style={{ height: Spacing.xl }} />
       </ScrollView>
     </SafeAreaView>
   );
+}
+
+function proofEventLabel(eventType: string | null): string {
+  const labels: Record<string, string> = {
+    AGREEMENT_CREATED: 'Criação do combinado',
+    AGREEMENT_ACCEPTED: 'Aceite do combinado',
+    AGREEMENT_REJECTED: 'Recusa do combinado',
+    AGREEMENT_CANCELLED: 'Cancelamento',
+    DISPUTE_OPENED: 'Contestação aberta',
+    DISPUTE_RESOLVED: 'Contestação resolvida',
+    PAYOUT_COMPLETED: 'Valor liberado',
+    DUAL_CONFIRMATION_PAYOUT: 'Liberação por dupla confirmação',
+    REFUND_COMPLETED: 'Reembolso',
+    PAYMENT_CONFIRMED: 'Pagamento confirmado',
+    FUNDS_LOCKED: 'Valor protegido',
+  };
+  return (eventType && labels[eventType]) ?? 'Evento do combinado';
+}
+
+function proofStatusLabel(status: string): string {
+  switch (status) {
+    case 'CONFIRMED': return 'Confirmado';
+    case 'SUBMITTED': return 'Registrado';
+    case 'PENDING': return 'Pendente';
+    case 'FAILED': return 'Falhou';
+    default: return status;
+  }
+}
+
+function proofStatusStyle(status: string) {
+  switch (status) {
+    case 'CONFIRMED': return { backgroundColor: '#e6f9f0', color: '#1a7a4a' };
+    case 'SUBMITTED': return { backgroundColor: '#e8f0fe', color: '#1a56db' };
+    case 'PENDING': return { backgroundColor: '#fff8e1', color: '#b45309' };
+    case 'FAILED': return { backgroundColor: '#fce8e8', color: '#c0392b' };
+    default: return {};
+  }
 }
 
 // ── Financial / Guarantee status labels ───────────────────────────
@@ -1300,4 +1375,12 @@ const styles = StyleSheet.create({
   resolutionJustification: { fontSize: FontSize.sm, color: Colors.textSecondary, lineHeight: 20, marginBottom: Spacing.xs },
   resolutionDate: { fontSize: FontSize.xs, color: Colors.textMuted, marginBottom: 2 },
   resolutionFinalStatus: { fontSize: FontSize.xs, color: Colors.textMuted, fontWeight: FontWeight.medium },
+
+  proofDisclaimer: { fontSize: FontSize.xs, color: Colors.textSecondary, lineHeight: 18, marginBottom: Spacing.md, fontStyle: 'italic' },
+  proofItem: { backgroundColor: Colors.bgBase, borderRadius: Radii.md, padding: Spacing.sm, marginBottom: Spacing.sm, borderWidth: 1, borderColor: Colors.border },
+  proofItemHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 },
+  proofEventLabel: { fontSize: FontSize.sm, fontWeight: FontWeight.medium, color: Colors.textPrimary, flex: 1 },
+  proofStatusBadge: { fontSize: FontSize.xs, fontWeight: FontWeight.semibold, paddingHorizontal: 8, paddingVertical: 2, borderRadius: Radii.full, overflow: 'hidden' },
+  proofHashText: { fontSize: FontSize.xs, color: Colors.textMuted, fontFamily: 'monospace', marginTop: 2 },
+  proofDate: { fontSize: FontSize.xs, color: Colors.textMuted, marginTop: 4 },
 });

@@ -91,6 +91,7 @@ pnpm dev:mobile
 - [Banco de dados — entidades e enums](docs/database.md)
 - [Ambientes e Segurança](docs/environments.md)
 - [Verificação Financeira (KYC Progressivo)](docs/financial-verification.md)
+- [Blockchain como Prova (Fase 26)](docs/blockchain-proof.md)
 
 ---
 
@@ -110,12 +111,12 @@ pnpm dev:mobile
 | Fase 23 | ✅ Concluído | Ambientes e Segurança: ThrottlerModule, CORS por ambiente, GlobalExceptionFilter, validateEnv, docs/environments.md |
 | Fase 24 | ✅ Concluído | Fitbank Sandbox / Pix Sandbox: IPaymentProvider, SimulatedProvider, FitbankSandboxProvider, webhook endpoint, 179 testes unitários, 92 E2E |
 | Fase 25 | ✅ Concluído | KYC Progressivo: verificação financeira sob demanda, FinancialProfile, CPF validado, bloqueio em acordo com garantia, 206 testes unitários, 101 E2E |
+| Fase 26 | ✅ Concluído | Blockchain como Prova: IBlockchainProofProvider, SimulatedProvider, hash canônico SHA-256, sanitização de dados sensíveis, endpoints /proofs, seção mobile, 239 testes unitários, 113 E2E |
 
 ## Próximas Etapas (não implementadas)
 
 | Fase | Descrição |
 |------|-----------|
-| Fase 26 | Blockchain Testnet como Prova |
 | Fase 27 | UX Final e Beta Fechado |
 
 ---

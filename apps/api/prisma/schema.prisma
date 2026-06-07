@@ -615,7 +615,7 @@ model Agreement {
   payouts            Payout[]
   refunds            Refund[]
   dispute            Dispute?
-  blockchainRecord   BlockchainRecord?
+  blockchainRecords  BlockchainRecord[]
 
   @@index([createdById])
   @@index([payerId])
@@ -1019,25 +1019,33 @@ model TrustScoreEvent {
 
 // =============================================================
 // MODEL: BlockchainRecord
-// Stub para Fase 4. Armazena o hash SHA256 dos termos do acordo
-// e o hash da transação na blockchain após confirmação.
+// Fase 26. Cada evento relevante do acordo gera um registro
+// independente de prova de integridade.
 //
-// proofHash: hash enviado/registrado na blockchain.
-// Diferente de Agreement.contentHash, que é o hash local
-// dos termos calculado antes de qualquer submissão à chain.
+// proofHash: SHA-256 do payload canônico sanitizado do evento.
+// txHash: hash da transação na blockchain (preenchido apenas
+//   quando BLOCKCHAIN_PROVIDER=testnet e chamada real habilitada).
+// eventType: identifica qual evento gerou a prova.
+// submittedAt: quando foi submetido ao provider blockchain.
+//
+// Relação 1:N com Agreement — múltiplos eventos por acordo.
+// agreementId NÃO é @unique — enforçado via @@index.
 // =============================================================
 
 model BlockchainRecord {
   id              String                 @id @default(cuid())
-  agreementId     String                 @unique
+  agreementId     String
+  eventType       String? // e.g. AGREEMENT_CREATED, AGREEMENT_ACCEPTED, DISPUTE_OPENED
   network         BlockchainNetwork      @default(ETHEREUM_TESTNET)
   txHash          String?
   blockNumber     BigInt?
   contractAddress String?
-  proofHash       String? // hash registrado na blockchain
-  proofData       Json? // dados que geraram o proofHash
+  proofHash       String? // SHA-256 do payload canônico sanitizado
+  proofData       Json? // dados que geraram o proofHash (sem dados sensíveis)
   status          BlockchainRecordStatus @default(PENDING)
+  errorMessage    String? // detalhes do erro quando status=FAILED
   retryCount      Int                    @default(0)
+  submittedAt     DateTime? // quando submetido ao provider
   confirmedAt     DateTime?
   failedAt        DateTime?
   createdAt       DateTime               @default(now())
@@ -1045,7 +1053,9 @@ model BlockchainRecord {
 
   agreement Agreement @relation(fields: [agreementId], references: [id], onDelete: Cascade)
 
+  @@index([agreementId])
   @@index([txHash])
+  @@index([status])
   @@map("blockchain_records")
 }
 

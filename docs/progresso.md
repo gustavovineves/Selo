@@ -1,6 +1,6 @@
 # Progresso do Projeto Selo
 
-Última atualização: 2026-06-07 (Fase 25 — KYC Progressivo)
+Última atualização: 2026-06-07 (Fase 26 — Blockchain como Prova)
 
 ---
 
@@ -51,6 +51,8 @@
 | Auditoria Final do MVP Simulado | ✅ Implementado (Fase 20) |
 | Score de Confiança | ✅ recordEvent implementado (Fase 5 e 6) |
 | Git local | ✅ Limpo após commit da Fase 4 |
+| KYC Progressivo (FinancialProfile, CPF, bloqueio garantia) | ✅ Implementado (Fase 25) |
+| Blockchain como Prova (hash canônico, provider simulated, endpoints /proofs) | ✅ Implementado (Fase 26) |
 
 ### Estrutura do monorepo
 
@@ -1782,14 +1784,125 @@ Preparar o Selo para verificação financeira progressiva: cadastro continua lev
 
 ---
 
+## 5t. Fase 26 — Blockchain como Prova (Implementada)
+
+### Objetivo
+
+Implementar camada de prova de integridade baseada em blockchain: registrar hash canônico de eventos relevantes dos acordos. A blockchain **não guarda dinheiro** — apenas prova que o evento existia em determinado momento.
+
+### Auditoria inicial
+
+- Branch: `dev`
+- Estado: limpo antes da fase
+- `.env` real: **não rastreado**
+- Fase 25 (KYC Progressivo): implementada e testada
+- `BlockchainRecord` já existia como stub com campo `agreementId @unique` (relação 1:1)
+
+### Migration criada
+
+`20260607041014_fase26_blockchain_proof_events`
+
+Alterações:
+- Removido `@unique` de `BlockchainRecord.agreementId` (agora 1:N)
+- Adicionado `eventType String?`
+- Adicionado `submittedAt DateTime?`
+- Adicionado `errorMessage String?`
+- Alterado `Agreement.blockchainRecord` → `Agreement.blockchainRecords BlockchainRecord[]`
+- Adicionados índices: `@@index([agreementId])`, `@@index([status])`
+
+### Arquivos criados
+
+| Arquivo | Descrição |
+|---|---|
+| `apps/api/src/common/utils/canonical-json.util.ts` | `canonicalJson()` + `sha256()` — hash determinístico |
+| `apps/api/src/common/utils/canonical-json.util.spec.ts` | 7 testes |
+| `apps/api/src/common/utils/sensitive-proof-sanitizer.util.ts` | Remove CPF, pixKey, tokens, secrets antes do hash |
+| `apps/api/src/common/utils/sensitive-proof-sanitizer.util.spec.ts` | 12 testes |
+| `apps/api/src/modules/blockchain-records/providers/blockchain-proof-provider.interface.ts` | Interface `IBlockchainProofProvider` + token DI |
+| `apps/api/src/modules/blockchain-records/providers/simulated-blockchain-proof.provider.ts` | Provider padrão — sem rede, txHash fake determinístico |
+| `apps/api/src/modules/blockchain-records/providers/testnet-blockchain-proof.provider.ts` | Stub testnet — retorna PENDING se `ENABLE_REAL_CALLS=false` |
+| `apps/api/src/modules/blockchain-records/blockchain-records.service.spec.ts` | 13 testes unitários |
+| `docs/blockchain-proof.md` | Documentação completa da Fase 26 |
+
+### Arquivos atualizados
+
+| Arquivo | Alteração |
+|---|---|
+| `apps/api/prisma/schema.prisma` | Migration 1:N + novos campos |
+| `apps/api/src/modules/blockchain-records/blockchain-records.service.ts` | `createProof()`, `getProofsForUser()`, `getProofsForAdmin()` |
+| `apps/api/src/modules/blockchain-records/blockchain-records.module.ts` | Factory do provider via DI |
+| `apps/api/src/modules/blockchain-records/blockchain-records.controller.ts` | Retorna provas do usuário |
+| `apps/api/src/modules/agreements/agreements.controller.ts` | `GET :id/proofs` (usuário) |
+| `apps/api/src/modules/agreements/agreements.service.ts` | 7x `createPending` → `createProof` com eventType |
+| `apps/api/src/modules/agreements/agreements.service.spec.ts` | Mock atualizado com `createProof` |
+| `apps/api/src/modules/admin/admin.controller.ts` | `GET admin/agreements/:id/proofs` |
+| `apps/api/src/modules/admin/admin.service.ts` | 2x `createPending` → `createProof` |
+| `apps/api/src/modules/admin/admin.service.spec.ts` | Mock atualizado |
+| `apps/api/src/test/helpers/factories.ts` | `blockchainRecord.findMany`, `findFirst` |
+| `apps/api/test/e2e/mvp-flow.e2e-spec.ts` | Bloco Fase 26 (+12 testes E2E) |
+| `apps/mobile/src/types/api.ts` | Tipo `AgreementProof` |
+| `apps/mobile/src/services/agreements.service.ts` | `getProofs()` |
+| `apps/mobile/app/agreement/[id].tsx` | Seção "Registros de prova" |
+| `.github/workflows/ci.yml` | Vars blockchain fake para CI |
+| `.env.example` + `apps/api/.env.example` | Seção blockchain adicionada |
+| `docs/environments.md` | Vars blockchain na tabela |
+| `docs/progresso.md` | Esta seção |
+| `README.md` | Fase 26 na tabela de concluídas; link para `blockchain-proof.md` |
+
+### Endpoints criados
+
+| Método | Rota | Auth | Descrição |
+|---|---|---|---|
+| GET | `/api/v1/agreements/:id/proofs` | JWT (participante) | Provas em linguagem segura |
+| GET | `/api/v1/admin/agreements/:id/proofs` | AdminJWT | Provas completas para auditoria |
+
+### Eventos cobertos por prova
+
+| Evento | `eventType` |
+|---|---|
+| Acordo criado (simples ou garantia) | `AGREEMENT_CREATED` |
+| Acordo aceito | `AGREEMENT_ACCEPTED` |
+| Valor liberado | `PAYOUT_COMPLETED` |
+| Liberação por dupla confirmação | `DUAL_CONFIRMATION_PAYOUT` |
+| Reembolso | `REFUND_COMPLETED` |
+| Contestação aberta | `DISPUTE_OPENED` |
+| Disputa resolvida (admin) | `DISPUTE_RESOLVED` |
+
+### Checklist de restrições
+
+| Restrição | Status |
+|---|---|
+| Blockchain guarda dinheiro? | **Não** |
+| Tokenização de reais? | **Não** |
+| Smart contract de escrow? | **Não** |
+| Rede externa chamada? | **Não** |
+| Private key real usada? | **Não** |
+| Fitbank produção? | **Não** |
+| KYC real? | **Não** |
+| dueDate relaxado? | **Não** |
+| Acordo com garantia sem destino? | **Não** |
+| KYC progressivo mantido? | **Sim** |
+| Commit feito? | **Não** |
+
+### Resultados dos testes
+
+| Comando | Resultado |
+|---|---|
+| `pnpm --filter @selo/api test` | ✅ **239 testes, 16 suítes, 0 falhas** |
+| `pnpm --filter @selo/api test:e2e` | ✅ **113 testes, 1 suíte, 0 falhas** |
+| `pnpm --filter @selo/api build` | ✅ Exit 0 |
+| `pnpm --filter @selo/mobile typecheck` | ✅ Exit 0 |
+| `pnpm --filter @selo/admin typecheck` | ✅ Exit 0 |
+
+---
+
 ## 7. Próxima Fase
 
-Fases sugeridas após KYC Progressivo (Fase 25), em ordem de prioridade:
+Fases sugeridas após Blockchain como Prova (Fase 26), em ordem de prioridade:
 
-- **Fase 26** — Blockchain Testnet: registro de hash de acordos em Ethereum/Polygon testnet
-- **Fase 27** — UX Final e Beta Fechado: animações, upload de avatar, polish geral
+- **Fase 27** — UX Final e Beta Fechado: animações, upload de avatar, central de ajuda, polish geral, beta fechado com usuários reais
 
-Não implementar sem instrução explícita: Fitbank real, blockchain real, KYC real, push notifications reais.
+Não implementar sem instrução explícita: Fitbank real, blockchain real com private key, KYC real, push notifications reais.
 
 ---
 
@@ -1861,3 +1974,5 @@ Invoke-RestMethod -Uri "http://localhost:3000/api/v1/receiving-keys/resolve/dev"
 | [docs/tests.md](tests.md) | Testes automatizados: estratégia, cobertura, comandos, limitações |
 | [docs/admin.md](admin.md) | Painel admin: auth real (AdminUser + JWT), endpoints, fluxo de disputa |
 | [docs/environments.md](environments.md) | Ambientes, variáveis, CORS, rate limit, logs, segurança, staging |
+| [docs/financial-verification.md](financial-verification.md) | KYC Progressivo: status, endpoints, regras, CPF mascarado (Fase 25) |
+| [docs/blockchain-proof.md](blockchain-proof.md) | Blockchain como Prova: provider, hash canônico, eventos, segurança (Fase 26) |

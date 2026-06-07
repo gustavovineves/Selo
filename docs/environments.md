@@ -57,6 +57,13 @@
 | `FITBANK_PIX_KEY` | — | Chave Pix Fitbank sandbox (Fase 24+) | ✅ fake |
 | `KYC_PROVIDER` | — | `simulated` (padrão) — sem chamada real (Fase 25+) | ✅ `simulated` |
 | `KYC_ENABLE_REAL_CALLS` | — | `false` — NUNCA mudar para `true` sem instrução explícita | ✅ `false` |
+| `BLOCKCHAIN_PROVIDER` | — | `simulated` (padrão) ou `testnet` (Fase 26+) | ✅ `simulated` |
+| `BLOCKCHAIN_NETWORK` | — | `polygon_amoy` ou `ethereum_sepolia` | ✅ `polygon_amoy` |
+| `BLOCKCHAIN_ENABLE_REAL_CALLS` | — | `false` — NUNCA mudar para `true` sem instrução explícita | ✅ `false` |
+| `BLOCKCHAIN_RPC_URL` | — | URL do nó RPC testnet (apenas com provider testnet real) | ✅ vazio |
+| `BLOCKCHAIN_PRIVATE_KEY` | — | Chave privada da conta testnet — NUNCA commitar | ✅ vazio |
+| `BLOCKCHAIN_CONTRACT_ADDRESS` | — | Endereço do contrato de prova no testnet | ✅ vazio |
+| `BLOCKCHAIN_CONFIRMATIONS` | — | Confirmações de bloco aguardadas (padrão: `1`) | ✅ `1` |
 
 ### 3.2 Admin Web (`apps/admin`)
 
@@ -99,7 +106,7 @@
 | `ADMIN_JWT_SECRET` | Deploy de staging e produção |
 | `CORS_ORIGINS` | Deploy de staging e produção |
 | `FITBANK_API_KEY` (Fase 24+) | Apenas produção/staging com BaaS |
-| `BLOCKCHAIN_PRIVATE_KEY` (Fase 26+) | Apenas produção/staging com blockchain |
+| `BLOCKCHAIN_PRIVATE_KEY` (Fase 26+) | Apenas testnet/produção com blockchain — NUNCA commitar |
 
 ### O que pode ficar inline no CI (valores fake)
 

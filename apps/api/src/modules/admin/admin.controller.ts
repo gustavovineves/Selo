@@ -15,11 +15,15 @@ import { CurrentAdmin } from '../../common/decorators/current-admin.decorator';
 import { AdminResolveReleaseDto } from './dto/admin-resolve-release.dto';
 import { AdminResolveRefundDto } from './dto/admin-resolve-refund.dto';
 import { AdminListDisputesDto } from './dto/admin-list-disputes.dto';
+import { BlockchainRecordsService } from '../blockchain-records/blockchain-records.service';
 
 @Controller('admin')
 @UseGuards(AdminJwtGuard)
 export class AdminController {
-  constructor(private readonly service: AdminService) {}
+  constructor(
+    private readonly service: AdminService,
+    private readonly blockchainRecords: BlockchainRecordsService,
+  ) {}
 
   // ── Dashboard ─────────────────────────────────────────────────
 
@@ -105,5 +109,10 @@ export class AdminController {
   @Get('agreements/:id')
   getAgreement(@Param('id') id: string) {
     return this.service.getAgreement(id);
+  }
+
+  @Get('agreements/:id/proofs')
+  getAgreementProofs(@Param('id') id: string) {
+    return this.blockchainRecords.getProofsForAdmin(id);
   }
 }

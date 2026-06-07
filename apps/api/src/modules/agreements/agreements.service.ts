@@ -313,10 +313,8 @@ export class AgreementsService {
       return a;
     });
 
-    // Blockchain: prova de criação do acordo (PENDING — submissão real na Fase 26)
     this.blockchainRecords
-      .createPending(agreement.id, {
-        event: 'AGREEMENT_CREATED',
+      .createProof(agreement.id, 'AGREEMENT_CREATED', {
         agreementId: agreement.id,
         type: 'SIMPLE',
         contentHash: agreement.contentHash,
@@ -521,10 +519,8 @@ export class AgreementsService {
       newData: { type: 'WITH_GUARANTEE', amount: dto.amount },
     });
 
-    // Blockchain: prova de criação do acordo com garantia (PENDING — submissão real na Fase 26)
     this.blockchainRecords
-      .createPending(agreement.id, {
-        event: 'AGREEMENT_CREATED',
+      .createProof(agreement.id, 'AGREEMENT_CREATED', {
         agreementId: agreement.id,
         type: 'WITH_GUARANTEE',
         amount: dto.amount,
@@ -864,8 +860,7 @@ export class AgreementsService {
       }
     }
 
-    await this.blockchainRecords.createPending(agreementId, {
-      event: 'PAYOUT_COMPLETED',
+    await this.blockchainRecords.createProof(agreementId, 'PAYOUT_COMPLETED', {
       agreementId,
       amount: guarantee.amount.toString(),
       currency: guarantee.currency,
@@ -1162,8 +1157,7 @@ export class AgreementsService {
       }
     }
 
-    await this.blockchainRecords.createPending(agreementId, {
-      event: 'DUAL_CONFIRMATION_PAYOUT',
+    await this.blockchainRecords.createProof(agreementId, 'DUAL_CONFIRMATION_PAYOUT', {
       agreementId,
       amount: guarantee.amount.toString(),
       currency: guarantee.currency,
@@ -1352,10 +1346,8 @@ export class AgreementsService {
       'Reembolso solicitado em acordo com garantia',
     );
 
-    // Blockchain: prova de reembolso (PENDING — submissão real na Fase 26)
     this.blockchainRecords
-      .createPending(agreementId, {
-        event: 'REFUND_COMPLETED',
+      .createProof(agreementId, 'REFUND_COMPLETED', {
         agreementId,
         requestedById: userId,
         amount: guarantee.amount.toString(),
@@ -1490,10 +1482,8 @@ export class AgreementsService {
       )
       .catch(() => {});
 
-    // Blockchain: prova de abertura de contestação (PENDING — submissão real na Fase 26)
     this.blockchainRecords
-      .createPending(agreementId, {
-        event: 'DISPUTE_OPENED',
+      .createProof(agreementId, 'DISPUTE_OPENED', {
         agreementId,
         openedById: userId,
         reason: dto.reason,
@@ -2032,10 +2022,8 @@ export class AgreementsService {
       });
     });
 
-    // Blockchain: prova de aceite do acordo (PENDING — submissão real na Fase 26)
     this.blockchainRecords
-      .createPending(id, {
-        event: 'AGREEMENT_ACCEPTED',
+      .createProof(id, 'AGREEMENT_ACCEPTED', {
         agreementId: id,
         acceptedById: userId,
         acceptedAt: new Date().toISOString(),

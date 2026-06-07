@@ -20,6 +20,7 @@ import { CancelAgreementDto } from './dto/cancel-agreement.dto';
 import { DeclineAgreementDto } from './dto/decline-agreement.dto';
 import { OpenDisputeDto } from './dto/open-dispute.dto';
 import { FinancialGuaranteesService } from '../financial-guarantees/financial-guarantees.service';
+import { BlockchainRecordsService } from '../blockchain-records/blockchain-records.service';
 
 @Controller('agreements')
 @UseGuards(JwtAuthGuard)
@@ -27,6 +28,7 @@ export class AgreementsController {
   constructor(
     private readonly service: AgreementsService,
     private readonly guaranteesService: FinancialGuaranteesService,
+    private readonly blockchainRecords: BlockchainRecordsService,
   ) {}
 
   // ── Criação ──────────────────────────────────────────────────
@@ -162,5 +164,13 @@ export class AgreementsController {
     @Param('id') agreementId: string,
   ) {
     return this.guaranteesService.findByAgreement(user.id, agreementId);
+  }
+
+  @Get(':id/proofs')
+  getProofs(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string,
+  ) {
+    return this.blockchainRecords.getProofsForUser(user.id, id);
   }
 }
